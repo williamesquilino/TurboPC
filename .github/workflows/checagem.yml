@@ -1,0 +1,24 @@
+# A cada envio: monta o TurboPC.ps1 a partir de src\, confere a sintaxe
+# e se o TurboPC.ps1 enviado está igual ao montado (ninguém editou o arquivo gerado por engano).
+name: Checagem
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checagem:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Montar o TurboPC.ps1 a partir de src
+        shell: powershell
+        run: .\build.ps1 -SoGerar
+
+      - name: Conferir se o TurboPC.ps1 enviado está atualizado
+        shell: powershell
+        run: |
+          git diff --exit-code -- TurboPC.ps1
+          if ($LASTEXITCODE) { throw 'O TurboPC.ps1 não bate com a pasta src\. Edite os arquivos em src\ e rode: powershell -File build.ps1 -SoGerar' }

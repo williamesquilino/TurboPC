@@ -1,0 +1,2 @@
+# guarda os arquivos exatamente como estão (CRLF + UTF-8 com BOM, que o PowerShell 5.1 precisa)
+* -text

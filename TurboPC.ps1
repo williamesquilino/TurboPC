@@ -1,4 +1,5 @@
-﻿#Requires -Version 5.1
+﻿# ARQUIVO GERADO pelo build.ps1 a partir da pasta src\. Não edite aqui: edite os arquivos em src\ e rode o build.
+#Requires -Version 5.1
 <#
     TurboPC - Otimizador para Windows 10/11
     Criado por William Silva Esquilino

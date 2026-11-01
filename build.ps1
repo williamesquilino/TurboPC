@@ -1,15 +1,33 @@
-﻿# Gera TurboPC.exe (interface) e TurboPC-Auto-Recomendado/Escritorio/Jogos.exe (sem janela), todos exigindo administrador.
-# Uso: powershell -ExecutionPolicy Bypass -File build.ps1
+﻿# Junta as partes de src\ no TurboPC.ps1 e gera TurboPC.exe (interface) e TurboPC-Auto-Recomendado/Escritorio/Jogos.exe
+# (sem janela), todos exigindo administrador.
+# Uso: powershell -ExecutionPolicy Bypass -File build.ps1            (gera o .ps1 e compila os .exe)
+#      powershell -ExecutionPolicy Bypass -File build.ps1 -SoGerar   (só gera o TurboPC.ps1)
+param([switch]$SoGerar)
 $ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
-$src  = Join-Path $root 'TurboPC.ps1'
-$out  = Join-Path $root 'dist'
-$ico  = Join-Path $root 'TurboPC.ico'
-New-Item -ItemType Directory -Path $out -Force | Out-Null
+$root   = $PSScriptRoot
+$srcDir = Join-Path $root 'src'
+$src    = Join-Path $root 'TurboPC.ps1'
+$out    = Join-Path $root 'dist'
+$ico    = Join-Path $root 'TurboPC.ico'
 
+# "#include caminho" puxa outra parte; a linha "# [parte] ..." do topo de cada arquivo é só descrição e fica de fora
+function Expand-Part([string]$Path) {
+    foreach ($line in [IO.File]::ReadAllLines($Path, [Text.Encoding]::UTF8)) {
+        if ($line -match '^\s*#include\s+(\S+)\s*$') { Expand-Part (Join-Path $srcDir $Matches[1]) }
+        elseif ($line -notmatch '^# \[parte\] ') { $line }
+    }
+}
+$banner = '# ARQUIVO GERADO pelo build.ps1 a partir da pasta src\. Não edite aqui: edite os arquivos em src\ e rode o build.'
+$lines  = @($banner) + @(Expand-Part (Join-Path $srcDir 'TurboPC.main.ps1'))
+$text   = ($lines -join "`r`n") + "`r`n"
+$errs   = $null
+[void][Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$errs)
+if ($errs) { throw "O TurboPC.ps1 gerado tem erro de sintaxe na linha $($errs[0].Extent.StartLineNumber): $($errs[0].Message)" }
 # o PowerShell 5.1 precisa de UTF-8 com BOM para os acentos
-$text = [IO.File]::ReadAllText($src, [Text.Encoding]::UTF8)
 [IO.File]::WriteAllText($src, $text, (New-Object Text.UTF8Encoding $true))
+"TurboPC.ps1 gerado: $($lines.Count) linhas"
+if ($SoGerar) { return }
+New-Item -ItemType Directory -Path $out -Force | Out-Null
 
 if (-not (Test-Path $ico)) {
     Add-Type -AssemblyName System.Drawing

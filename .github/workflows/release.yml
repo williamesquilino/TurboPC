@@ -21,6 +21,13 @@ jobs:
           $v = [regex]::Match((Get-Content TurboPC.ps1 -Raw), "\`$AppVersion\s*=\s*'(\d+\.\d+\.\d+)'").Groups[1].Value
           if ("v$v" -ne "${{ github.ref_name }}") { throw "A tag ${{ github.ref_name }} não bate com a versão do TurboPC.ps1 (v$v)" }
 
+      - name: Conferir se o TurboPC.ps1 bate com a pasta src
+        shell: powershell
+        run: |
+          .\build.ps1 -SoGerar
+          git diff --exit-code -- TurboPC.ps1
+          if ($LASTEXITCODE) { throw 'O TurboPC.ps1 não bate com a pasta src\. Rode build.ps1 -SoGerar e faça o commit.' }
+
       - name: Instalar ps2exe
         shell: powershell
         run: |

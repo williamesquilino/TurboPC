@@ -1,0 +1,272 @@
+﻿# [parte] XAML da aba Painel
+      <!-- ===================== PAINEL ===================== -->
+      <TabItem x:Name="TabHome">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,2,14,0"/>
+            <TextBlock Text="Painel" FontSize="14"/>
+          </StackPanel>
+        </TabItem.Header>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="Visão geral" Style="{StaticResource H1}"/>
+            <TextBlock x:Name="TxtHost" Style="{StaticResource Sub}" Margin="0,4,0,20" Text="Carregando informações do computador..."/>
+
+            <Grid Margin="0,0,-14,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel HorizontalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><TextBlock Text="&#xE95E;" Style="{StaticResource CardIcon}"/><TextBlock Text="SAÚDE DO PC" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <Grid Width="132" Height="132" Margin="0,14,0,4">
+                    <Ellipse Stroke="#262B37" StrokeThickness="11"/>
+                    <Ellipse x:Name="ScoreRing" Stroke="#4ADE80" StrokeThickness="11" StrokeDashArray="0 1000" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                      <Ellipse.RenderTransform><RotateTransform Angle="-90"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock x:Name="ScoreText" Text="-" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
+                      <TextBlock x:Name="ScoreLabel" FontSize="12.5" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="#8A91A3"/>
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9D9;" Style="{StaticResource CardIcon}"/><TextBlock Text="DIAGNÓSTICO" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <StackPanel x:Name="PanelDiag" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="2,4,0,4"><TextBlock Text="&#xE945;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Modos de otimização" Style="{StaticResource Section}"/></StackPanel>
+            <TextBlock Text="Escolha um. Antes de aplicar, você vê em palavras simples o que vai acontecer." Style="{StaticResource Sub}" Margin="2,0,0,12"/>
+            <Border Background="#141821" BorderBrush="#232836" BorderThickness="1" CornerRadius="12" Padding="16,12" Margin="0,0,0,12">
+              <DockPanel>
+                <Border x:Name="PcPowerPill" DockPanel.Dock="Right" CornerRadius="8" Padding="10,5" VerticalAlignment="Center" Background="#163326" Margin="12,0,0,0">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="PcPowerIcon" Text="&#xE83E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#4ADE80" Margin="0,1,7,0"/>
+                    <TextBlock x:Name="PcPowerText" Text="-" FontSize="12.5" FontWeight="SemiBold" Foreground="#4ADE80"/>
+                  </StackPanel>
+                </Border>
+                <Border Width="42" Height="42" CornerRadius="11" Background="#262050" VerticalAlignment="Center" Margin="0,0,14,0">
+                  <TextBlock x:Name="PcIcon" Text="&#xE977;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#A99BFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock x:Name="PcTitle" Text="Identificando o computador..." FontSize="14" FontWeight="SemiBold" Foreground="#F1F3F8"/>
+                  <TextBlock x:Name="PcDetail" FontSize="12.5" Foreground="#8A91A3" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                    <TextBlock x:Name="PcUsage" FontSize="12.5" FontWeight="SemiBold" Foreground="#A99BFF" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnUsage" Content="Mudar" Style="{StaticResource BtnGhost}" Padding="10,3" FontSize="11.5" Margin="10,0,0,0"/>
+                  </StackPanel>
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <UniformGrid x:Name="PanelModes" Columns="4" Margin="0,0,-12,0"/>
+            <WrapPanel Margin="0,0,0,6">
+              <Button x:Name="BtnDriver" Style="{StaticResource BtnGhost}" Padding="16,10" Margin="0,0,8,8" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Baixar driver de vídeo"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnReport" Style="{StaticResource BtnGhost}" Padding="16,10" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Exportar relatório"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnUndo" Style="{StaticResource BtnGhost}" Padding="16,10" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Desfazer otimização"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnRefresh" Style="{StaticResource BtnGhost}" Padding="16,10" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Atualizar informações"/></StackPanel>
+              </Button>
+            </WrapPanel>
+            <Border Background="#171B24" BorderBrush="#232836" BorderThickness="1" CornerRadius="14" Padding="18,16" Margin="0,4,0,8">
+              <DockPanel>
+                <Button x:Name="BtnFps" DockPanel.Dock="Right" Style="{StaticResource Btn}" Background="#0EA5E9" VerticalAlignment="Center" Padding="18,11" Margin="16,0,0,0">
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7FC;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,1,9,0"/><TextBlock Text="Medir FPS"/></StackPanel>
+                </Button>
+                <Border Width="42" Height="42" CornerRadius="11" Background="#2638BDF8" VerticalAlignment="Top" Margin="0,0,14,0">
+                  <TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="Teste de FPS" FontSize="15" FontWeight="SemiBold" Foreground="#F4F5F9"/>
+                  <TextBlock x:Name="FpsInfo" Text="Mede o FPS de um jogo em 30 segundos. Meça antes e depois de otimizar: se piorar, o TurboPC mostra e oferece desfazer." FontSize="12.5" Foreground="#8A91A3" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                  <StackPanel x:Name="FpsResult"/>
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <TextBlock x:Name="TxtFreed" Style="{StaticResource Sub}" Margin="0"/>
+
+            <StackPanel Orientation="Horizontal" Margin="2,4,0,12">
+              <TextBlock Text="&#xE9D2;" Style="{StaticResource SectionIcon}"/>
+              <TextBlock Text="Agora" Style="{StaticResource Section}"/>
+              <Border CornerRadius="8" Background="#163326" Padding="8,2" Margin="12,2,0,0" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                  <Ellipse Width="7" Height="7" Fill="#4ADE80" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <TextBlock Text="ao vivo" FontSize="11" FontWeight="SemiBold" Foreground="#4ADE80"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <UniformGrid Columns="4" Margin="0,0,-14,0">
+<!--GAUGES-->
+            </UniformGrid>
+            <Grid Margin="0,0,-14,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource CardBox}">
+                <DockPanel>
+                  <Grid DockPanel.Dock="Top">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE839;" Style="{StaticResource CardIcon}" Foreground="#4ADE80"/><TextBlock Text="INTERNET" Style="{StaticResource CardTitle}"/></StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                      <Ellipse Width="8" Height="8" Fill="#4ADE80" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBlock Text="Recebendo" FontSize="12" Foreground="#8A91A3" Margin="0,0,6,0"/>
+                      <TextBlock x:Name="MonNet" Text="-" FontSize="12.5" FontWeight="SemiBold" Foreground="#F1F3F8" Margin="0,0,18,0"/>
+                      <Ellipse Width="8" Height="8" Fill="#60A5FA" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBlock Text="Enviando" FontSize="12" Foreground="#8A91A3" Margin="0,0,6,0"/>
+                      <TextBlock x:Name="MonNetSub" Text="-" FontSize="12.5" FontWeight="SemiBold" Foreground="#F1F3F8"/>
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock x:Name="MonNetPeak" DockPanel.Dock="Top" Style="{StaticResource CardSub}" Margin="0,6,0,0"/>
+                  <Canvas x:Name="ChartNet" Height="150" Margin="0,12,0,0" ClipToBounds="True"/>
+                </DockPanel>
+              </Border>
+              <Border Grid.Column="1" Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEDA2;" Style="{StaticResource CardIcon}"/><TextBlock Text="ARMAZENAMENTO" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <Grid Width="118" Height="118" Margin="0,12,0,10" HorizontalAlignment="Center">
+                    <Ellipse Stroke="#232838" StrokeThickness="12"/>
+                    <Ellipse x:Name="DiskRing" Stroke="#7C5CFF" StrokeThickness="12" StrokeDashArray="0 1000" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                      <Ellipse.RenderTransform><RotateTransform Angle="-90"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock x:Name="DiskPct" Text="-" FontSize="24" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                      <TextBlock Text="ocupado" FontSize="11" Foreground="#8A91A3" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                  </Grid>
+                  <StackPanel x:Name="PanelDrives"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="2,10,0,12"><TextBlock Text="&#xE770;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Este computador" Style="{StaticResource Section}"/></StackPanel>
+            <UniformGrid Columns="3" Margin="0,0,-14,0">
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE770;" Style="{StaticResource CardIcon}"/><TextBlock Text="SISTEMA" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoOS" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoOSSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE945;" Style="{StaticResource CardIcon}"/><TextBlock Text="PROCESSADOR" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoCPU" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoCPUSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE964;" Style="{StaticResource CardIcon}"/><TextBlock Text="MEMÓRIA RAM" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoRAM" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoRAMSub" Style="{StaticResource CardSub}"/>
+                  <ProgressBar x:Name="BarRAM" Style="{StaticResource Bar}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8B7;" Style="{StaticResource CardIcon}"/><TextBlock Text="ESPAÇO NO C:" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoDisk" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoDiskSub" Style="{StaticResource CardSub}"/>
+                  <ProgressBar x:Name="BarDisk" Style="{StaticResource Bar}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEDA2;" Style="{StaticResource CardIcon}"/><TextBlock Text="TIPO DE DISCO" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoMedia" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoMediaSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE823;" Style="{StaticResource CardIcon}"/><TextBlock Text="LIGADO HÁ" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoUptime" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoUptimeSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" Style="{StaticResource CardIcon}"/><TextBlock Text="PLACA DE VÍDEO" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoGPU" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoGPUSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" Style="{StaticResource CardIcon}"/><TextBlock Text="DRIVER DE VÍDEO" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoDrv" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoDrvSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardBox}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F8;" Style="{StaticResource CardIcon}"/><TextBlock Text="MONITOR" Style="{StaticResource CardTitle}"/></StackPanel>
+                  <TextBlock x:Name="InfoMon" Style="{StaticResource CardValue}" Text="-"/>
+                  <TextBlock x:Name="InfoMonSub" Style="{StaticResource CardSub}"/>
+                </StackPanel>
+              </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource CardBox}" Margin="0,0,0,14">
+              <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                  <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9F9;" Style="{StaticResource CardIcon}"/><TextBlock Text="PROGRAMAS QUE MAIS PESAM AGORA" Style="{StaticResource CardTitle}"/></StackPanel>
+                    <TextBlock Text="Programas com várias janelas ou abas (Chrome, Teams) aparecem somados." Style="{StaticResource CardSub}" Margin="0,3,0,0"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="BtnSortCpu" Content="Por CPU" Style="{StaticResource BtnGhost}" Padding="12,7" Margin="0,0,6,0"/>
+                    <Button x:Name="BtnSortRam" Content="Por memória" Style="{StaticResource BtnGhost}" Padding="12,7" Margin="0,0,14,0"/>
+                    <Button x:Name="BtnKill" Style="{StaticResource Btn}" Background="#B4374A" Padding="14,7">
+                      <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Encerrar programa"/></StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+                <Grid DockPanel.Dock="Top" Margin="12,0,12,6">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="80"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="Programa" Foreground="#6F778A" FontSize="11.5"/>
+                  <TextBlock Grid.Column="1" Text="CPU" Foreground="#6F778A" FontSize="11.5" HorizontalAlignment="Right"/>
+                  <TextBlock Grid.Column="2" Text="Memória" Foreground="#6F778A" FontSize="11.5" HorizontalAlignment="Right"/>
+                  <TextBlock Grid.Column="3" Text="Processos" Foreground="#6F778A" FontSize="11.5" HorizontalAlignment="Right"/>
+                </Grid>
+                <ListBox x:Name="ProcList" Background="Transparent" BorderThickness="0" Height="330"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                  <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                      <Setter Property="Template">
+                        <Setter.Value>
+                          <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="12,7">
+                              <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#1B2030"/></Trigger>
+                              <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="Background" Value="#272050"/></Trigger>
+                            </ControlTemplate.Triggers>
+                          </ControlTemplate>
+                        </Setter.Value>
+                      </Setter>
+                    </Style>
+                  </ListBox.ItemContainerStyle>
+                </ListBox>
+              </DockPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+

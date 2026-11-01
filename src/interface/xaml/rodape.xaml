@@ -1,0 +1,29 @@
+﻿# [parte] XAML do rodapé e fim do XAML
+    <!-- ===================== RODAPÉ ===================== -->
+    <Border Grid.Row="1" Background="#12151D" BorderBrush="#1F2430" BorderThickness="0,1,0,0" Padding="24,14">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
+          <DockPanel>
+            <TextBlock x:Name="TxtSelCount" DockPanel.Dock="Right" Foreground="#8A91A3" FontSize="12"/>
+            <TextBlock x:Name="StatusText" Text="Pronto." Foreground="#C9CFDB" FontSize="13" TextTrimming="CharacterEllipsis"/>
+          </DockPanel>
+          <ProgressBar x:Name="Progress" Style="{StaticResource Bar}" Margin="0,8,0,0"/>
+        </StackPanel>
+        <StackPanel x:Name="FooterTasks" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <CheckBox x:Name="ChkRestore" Style="{StaticResource Toggle}" IsChecked="True" VerticalAlignment="Center" Margin="0,0,20,0">
+            <TextBlock Text="Ponto de restauração antes" Foreground="#C9CFDB" FontSize="12.5"/>
+          </CheckBox>
+          <Button x:Name="BtnRec" Content="Marcar Escritório" Style="{StaticResource BtnGhost}" Margin="0,0,8,0"/>
+          <Button x:Name="BtnRecGame" Content="Marcar Jogos" Style="{StaticResource BtnGhost}" Margin="0,0,8,0"/>
+          <Button x:Name="BtnNone" Content="Limpar seleção" Style="{StaticResource BtnGhost}" Margin="0,0,8,0"/>
+          <Button x:Name="BtnRun" Content="Executar selecionados" Style="{StaticResource Btn}"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
+'@

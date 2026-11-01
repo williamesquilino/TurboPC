@@ -1,0 +1,87 @@
+﻿# [parte] XAML da aba Programas
+      <!-- ===================== PROGRAMAS ===================== -->
+      <TabItem x:Name="TabProg">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE71D;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,2,14,0"/>
+            <TextBlock Text="Programas" FontSize="14"/>
+          </StackPanel>
+        </TabItem.Header>
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="Programas" Style="{StaticResource H1}"/>
+            <TextBlock Text="Instale vários programas de uma vez e escolha o que abre junto com o Windows." Style="{StaticResource Sub}"/>
+          </StackPanel>
+          <TabControl x:Name="SubProg" Style="{StaticResource ChipTabs}">
+            <TabItem Style="{StaticResource Chip}">
+              <TabItem.Header>
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,2,8,0"/><TextBlock Text="Instalar programas" FontSize="13"/></StackPanel>
+              </TabItem.Header>
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Style="{StaticResource CardBox}" Margin="0,0,0,12" Padding="16,12">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button x:Name="BtnInstallChoco" Content="Instalar Chocolatey" Style="{StaticResource BtnGhost}" Padding="14,8" Margin="0,0,8,0"/>
+                      <Button x:Name="BtnGetWinget" Content="Instalar winget" Style="{StaticResource BtnGhost}" Padding="14,8" Margin="0,0,8,0" Visibility="Collapsed"/>
+                      <Button x:Name="BtnUpgradeAll" Style="{StaticResource BtnGhost}" Padding="14,8">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Atualizar todos os programas do PC"/></StackPanel>
+                      </Button>
+                    </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock x:Name="TxtWinget" FontSize="13" Foreground="#D5D9E3"/>
+                      <TextBlock x:Name="TxtChoco" FontSize="13" Foreground="#D5D9E3" Margin="0,3,0,0"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border Background="#171B24" BorderBrush="#2A3040" BorderThickness="1" CornerRadius="9">
+                    <Grid>
+                      <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="#5F6679" FontSize="13" Margin="12,10,0,0" IsHitTestVisible="False"/>
+                      <TextBlock x:Name="TxtAppHint" Text="Pesquisar programa..." Foreground="#5F6679" FontSize="13" Margin="34,9,0,9" IsHitTestVisible="False"/>
+                      <TextBox x:Name="TxtAppSearch" Background="Transparent" BorderThickness="0" Foreground="#E6E8EE" CaretBrush="White" FontSize="13" Padding="31,8,10,8"/>
+                    </Grid>
+                  </Border>
+                  <CheckBox x:Name="ChkChoco" Grid.Column="1" Style="{StaticResource Toggle}" IsChecked="True" VerticalAlignment="Center" Margin="20,0,0,0">
+                    <TextBlock Text="Usar o Chocolatey se o winget falhar" Foreground="#C9CFDB" FontSize="12.5"/>
+                  </CheckBox>
+                </Grid>
+                <Border DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                      <Button x:Name="BtnAppsNone" Content="Limpar seleção" Style="{StaticResource BtnGhost}" Margin="0,0,8,0"/>
+                      <Button x:Name="BtnUninstall" Style="{StaticResource BtnGhost}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Desinstalar marcados"/></StackPanel>
+                      </Button>
+                      <Button x:Name="BtnInstall" Style="{StaticResource Btn}">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Instalar marcados"/></StackPanel>
+                      </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtAppSel" VerticalAlignment="Center" Foreground="#8A91A3" FontSize="12.5" Text="Nenhum programa marcado."/>
+                  </DockPanel>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="PanelApps" Margin="0,0,14,0"/></ScrollViewer>
+              </DockPanel>
+            </TabItem>
+            <TabItem Style="{StaticResource Chip}">
+              <TabItem.Header>
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,2,8,0"/><TextBlock Text="Inicialização" FontSize="13"/></StackPanel>
+              </TabItem.Header>
+              <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,14">
+                  <TextBlock Text="Programas que abrem junto com o Windows. Desligue o que não for necessário: é o mesmo que fazer pelo Gerenciador de Tarefas, dá para religar depois." Style="{StaticResource Sub}" Margin="0,0,320,0" VerticalAlignment="Center"/>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Button x:Name="BtnReloadStartup" Content="Recarregar" Style="{StaticResource BtnGhost}" Margin="0,0,8,0"/>
+                    <Button x:Name="BtnSaveStartup" Content="Salvar alterações" Style="{StaticResource Btn}"/>
+                  </StackPanel>
+                </Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="PanelStartup" Margin="0,0,14,0"/></ScrollViewer>
+              </DockPanel>
+            </TabItem>
+          </TabControl>
+        </DockPanel>
+      </TabItem>
+

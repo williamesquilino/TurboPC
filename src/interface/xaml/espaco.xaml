@@ -1,0 +1,86 @@
+﻿# [parte] XAML da aba Espaço
+      <!-- ===================== ESPAÇO ===================== -->
+      <TabItem x:Name="TabSpace">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xEDA2;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,2,14,0"/>
+            <TextBlock Text="Espaço" FontSize="14"/>
+          </StackPanel>
+        </TabItem.Header>
+        <ScrollViewer x:Name="SpaceScroll" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="0,0,14,0">
+            <Grid Margin="0,0,0,18">
+              <StackPanel Margin="0,0,330,0">
+                <TextBlock Text="Espaço em disco" Style="{StaticResource H1}"/>
+                <TextBlock Text="O que está ocupando o seu disco e o que dá para apagar com segurança. Nada é apagado sem você confirmar." Style="{StaticResource Sub}"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <WrapPanel x:Name="PanelDriveBtns" VerticalAlignment="Center"/>
+                <Button x:Name="BtnSpaceScan" Style="{StaticResource BtnGhost}" Margin="8,0,0,0">
+                  <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Analisar de novo"/></StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+
+            <Border Style="{StaticResource CardBox}" Margin="0,0,0,18">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="170"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid Width="136" Height="136" HorizontalAlignment="Left">
+                  <Ellipse Stroke="#232838" StrokeThickness="13"/>
+                  <Ellipse x:Name="SpaceRing" Stroke="#7C5CFF" StrokeThickness="13" StrokeDashArray="0 1000" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform><RotateTransform Angle="-90"/></Ellipse.RenderTransform>
+                  </Ellipse>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="SpaceFree" Text="-" FontSize="25" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="livres" FontSize="12" Foreground="#8A91A3" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock x:Name="SpaceTitle" Text="Analisando o disco..." FontSize="17" FontWeight="SemiBold" Foreground="#F4F5F9"/>
+                  <TextBlock x:Name="SpaceStatus" FontSize="12.5" Foreground="#8A91A3" Margin="0,4,0,12" TextWrapping="Wrap"/>
+                  <ProgressBar x:Name="SpaceProgress" Height="6" Maximum="100" Foreground="#7C5CFF" Background="#262B37" BorderThickness="0" Margin="0,0,0,12"/>
+                  <Border CornerRadius="7" ClipToBounds="True" Height="16" Background="#232838">
+                    <Grid x:Name="SpaceBar"/>
+                  </Border>
+                  <WrapPanel x:Name="SpaceLegend" Margin="0,12,0,0"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <DockPanel Margin="2,0,0,4">
+              <Button x:Name="BtnFreeSafe" DockPanel.Dock="Right" Style="{StaticResource Btn}" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock x:Name="TxtFreeSafe" Text="Liberar o que é seguro"/></StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE74D;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Dá para liberar agora" Style="{StaticResource Section}"/></StackPanel>
+            </DockPanel>
+            <TextBlock Text="Lixo que o Windows e os programas deixam para trás. Os de cima são seguros; os outros têm um aviso." Style="{StaticResource Sub}" Margin="2,0,0,12"/>
+            <UniformGrid x:Name="PanelJunk" Columns="3" Margin="0,0,-12,8"/>
+            <StackPanel x:Name="SecHidden" Visibility="Collapsed">
+              <StackPanel Orientation="Horizontal" Margin="2,12,0,4"><TextBlock Text="&#xE721;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Coisas escondidas que ocupam muito" Style="{StaticResource Section}"/></StackPanel>
+              <TextBlock Text="Não aparecem como programa instalado, mas costumam ser o que mais enche o disco. Cada uma explica o que é e o que dá para fazer." Style="{StaticResource Sub}" Margin="2,0,0,12"/>
+              <StackPanel x:Name="PanelHidden" Margin="0,0,0,8"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="2,12,0,4"><TextBlock Text="&#xE8A5;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Arquivos grandes" Style="{StaticResource Section}"/></StackPanel>
+            <TextBlock Text="Arquivos de 500 MB ou mais nas suas pastas. Veja se ainda precisa deles: o que você apagar vai para a Lixeira (dá para recuperar)." Style="{StaticResource Sub}" Margin="2,0,0,12"/>
+            <StackPanel x:Name="PanelBigFiles" Margin="0,0,0,8"/>
+
+            <StackPanel Orientation="Horizontal" Margin="2,12,0,4"><TextBlock Text="&#xE71D;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Programas e jogos que mais ocupam" Style="{StaticResource Section}"/></StackPanel>
+            <TextBlock Text="Desinstalar remove o programa por completo, pelo desinstalador do próprio fabricante (ou pela Steam, no caso dos jogos dela)." Style="{StaticResource Sub}" Margin="2,0,0,12"/>
+            <StackPanel x:Name="PanelBigApps" Margin="0,0,0,8"/>
+
+            <DockPanel Margin="2,12,0,4">
+              <Button x:Name="BtnFolderUp" DockPanel.Dock="Right" Style="{StaticResource BtnGhost}" Padding="12,7" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Voltar"/></StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8B7;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Pastas que mais ocupam" Style="{StaticResource Section}"/></StackPanel>
+            </DockPanel>
+            <TextBlock x:Name="TxtFolderPath" Style="{StaticResource Sub}" Margin="2,0,0,12" Text="Clique numa pasta para ver o que tem dentro."/>
+            <StackPanel x:Name="PanelFolders" Margin="0,0,0,14"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+

@@ -1,0 +1,39 @@
+﻿# [parte] XAML da aba Histórico
+      <!-- ===================== HISTÓRICO ===================== -->
+      <TabItem x:Name="TabLog">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,2,14,0"/>
+            <TextBlock Text="Histórico" FontSize="14"/>
+          </StackPanel>
+        </TabItem.Header>
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+            <StackPanel Margin="0,0,620,0">
+              <TextBlock Text="Histórico" Style="{StaticResource H1}"/>
+              <TextBlock Text="Tudo o que o TurboPC mudou neste PC. Se algo ficou diferente do que você queria, clique em Desfazer: as configurações voltam a ser o que eram antes." Style="{StaticResource Sub}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+              <Button x:Name="BtnRestore" Style="{StaticResource BtnGhost}" Margin="0,0,8,0">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Criar ponto de restauração"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnSysRestore" Style="{StaticResource BtnGhost}" Margin="0,0,8,0">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Restauração do sistema"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnOpenLogs" Style="{StaticResource BtnGhost}">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" Margin="0,2,8,0"/><TextBlock Text="Pasta de logs"/></StackPanel>
+              </Button>
+            </StackPanel>
+          </Grid>
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="2,0,0,10"><TextBlock Text="&#xE7A7;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Otimizações feitas" Style="{StaticResource Section}"/></StackPanel>
+          <ScrollViewer DockPanel.Dock="Top" MaxHeight="300" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16"><StackPanel x:Name="PanelHistory" Margin="0,0,14,0"/></ScrollViewer>
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="2,0,0,4"><TextBlock Text="&#xE9D9;" Style="{StaticResource SectionIcon}"/><TextBlock Text="Registro desta sessão" Style="{StaticResource Section}"/></StackPanel>
+          <TextBlock x:Name="TxtLogPath" DockPanel.Dock="Top" Style="{StaticResource Sub}" Margin="2,0,0,10"/>
+          <Border Background="#0A0C11" BorderBrush="#232836" BorderThickness="1" CornerRadius="12" Padding="4">
+            <TextBox x:Name="LogBox" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="#C9D1E0"
+                     FontFamily="Consolas" FontSize="12.5" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10"/>
+          </Border>
+        </DockPanel>
+      </TabItem>
+    </TabControl>
+

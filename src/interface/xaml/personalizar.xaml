@@ -1,0 +1,20 @@
+﻿# [parte] XAML da aba Personalizar
+      <!-- ===================== OTIMIZAR ===================== -->
+      <TabItem x:Name="TabOpt">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xEC4A;" FontFamily="Segoe MDL2 Assets" FontSize="15" Margin="0,2,14,0"/>
+            <TextBlock Text="Personalizar" FontSize="14"/>
+          </StackPanel>
+        </TabItem.Header>
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="Personalizar" Style="{StaticResource H1}"/>
+            <TextBlock Text="Para quem quer escolher item por item. Se não sabe o que escolher, use os modos do Painel: eles já fazem a escolha certa." Style="{StaticResource Sub}"/>
+          </StackPanel>
+          <TabControl x:Name="SubOpt" Style="{StaticResource ChipTabs}">
+<!--OPTCHIPS-->
+          </TabControl>
+        </DockPanel>
+      </TabItem>
+

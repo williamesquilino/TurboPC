@@ -161,6 +161,19 @@ Baixe os `.exe` na página de **[Releases](https://github.com/williamesquilino/T
 
 ## Para quem mexe no código
 
-- Tudo está no `TurboPC.ps1` (PowerShell 5.1 + WPF). A versão fica em `$AppVersion`, no começo do arquivo.
-- Para compilar os `.exe` localmente: `powershell -ExecutionPolicy Bypass -File build.ps1` (precisa do módulo `ps2exe`).
-- **Publicar uma versão:** troque o `$AppVersion`, faça o commit e envie uma tag com o mesmo número (ex.: `git tag v1.9.0` e `git push origin v1.9.0`). O GitHub Actions (`.github/workflows/release.yml`) compila os `.exe` e publica a release; os PCs com TurboPC recebem a atualização.
+O código fica na pasta **`src/`**, dividido por assunto. O `TurboPC.ps1` da raiz é **gerado** a partir dela: não edite ele direto.
+
+| Pasta | O que tem |
+|---|---|
+| `src/core/` | Cabeçalho e parâmetros, pedido de administrador, modo sem janela (`-Auto`, `-List`) |
+| `src/biblioteca/` | As otimizações, uma categoria por arquivo (`tarefas-limpeza.ps1`, `tarefas-jogos.ps1`...), os modos e o desfazer. É o que roda tanto na interface quanto no modo sem janela |
+| `src/interface/` | A interface: Painel, monitor, Espaço, Teste de FPS, programas, histórico, atualização, eventos |
+| `src/interface/xaml/` | O visual de cada aba (XAML) |
+| `src/TurboPC.main.ps1` | A ordem em que as partes são juntadas |
+
+Cada arquivo começa com uma linha `# [parte] ...` explicando o que tem nele (essa linha não vai para o arquivo final).
+
+- **Gerar o `TurboPC.ps1`** depois de mudar algo em `src/`: `powershell -ExecutionPolicy Bypass -File build.ps1 -SoGerar` (confere a sintaxe também).
+- **Compilar os `.exe`** localmente: `powershell -ExecutionPolicy Bypass -File build.ps1` (precisa do módulo `ps2exe`).
+- **Publicar uma versão:** troque o `$AppVersion` em `src/core/cabecalho.ps1`, rode o `build.ps1 -SoGerar`, faça o commit e envie uma tag com o mesmo número (ex.: `git tag v1.9.0` e `git push origin v1.9.0`). O GitHub Actions compila os `.exe` e publica a release; os PCs com TurboPC recebem a atualização.
+- A cada envio, o GitHub confere se o `TurboPC.ps1` está igual ao que a pasta `src/` gera (checagem `Checagem`).
