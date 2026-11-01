@@ -1,0 +1,40 @@
+# Ao enviar uma tag de versão (ex.: v1.8.0), compila os .exe e publica a release.
+# O botão "Atualizar" do TurboPC baixa os .exe desta release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir versão da tag
+        shell: powershell
+        run: |
+          $v = [regex]::Match((Get-Content TurboPC.ps1 -Raw), "\`$AppVersion\s*=\s*'(\d+\.\d+\.\d+)'").Groups[1].Value
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "A tag ${{ github.ref_name }} não bate com a versão do TurboPC.ps1 (v$v)" }
+
+      - name: Instalar ps2exe
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module ps2exe -Scope CurrentUser -Force
+
+      - name: Compilar
+        shell: powershell
+        run: .\build.ps1
+
+      - name: Publicar release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" (Get-ChildItem dist\*.exe).FullName `
+            --title "TurboPC ${{ github.ref_name }}" --generate-notes

@@ -1,0 +1,5 @@
+# os .exe são gerados pelo GitHub Actions e ficam nas releases
+dist/
+*.log
+*.new
+*.old
