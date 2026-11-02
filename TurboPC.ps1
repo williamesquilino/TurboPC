@@ -25,7 +25,7 @@ param(
 
 $AppName    = 'TurboPC'
 $AppAuthor  = 'William Silva Esquilino'
-$AppVersion = '1.10.1'
+$AppVersion = '1.10.2'
 
 # Quando compilado com ps2exe: um .exe com "Auto" no nome roda direto um modo (o nome do arquivo diz qual).
 $ExePath    = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -2879,12 +2879,12 @@ function Set-Score {
     $score = [math]::Max(5, 100 - $script:Penalty)
     $label, $color = if ($score -ge 85) { 'Ótimo', '#4ADE80' } elseif ($score -ge 65) { 'Bom', '#A3E635' }
                      elseif ($score -ge 45) { 'Regular', '#F5A524' } else { 'Precisa de atenção', '#F87171' }
-    $ui.ScoreText.Text = "$score"
     $ui.ScoreLabel.Text = $label
     $ui.ScoreLabel.Foreground = $color
     $ui.ScoreRing.Stroke = $color
-    # circunferência em unidades de espessura do traço: pi * (132 - 11) / 11
-    $ui.ScoreRing.StrokeDashArray = New-Object Windows.Media.DoubleCollection (,[double[]]@((([math]::PI * 121 / 11) * $score / 100), 1000))
+    # a nota sobe animada a partir de onde o anel está (o temporizador do anel desenha)
+    $script:RingTarget = [double]$score; $script:RingMode = 'score'
+    $ringTimer.Start()
 }
 
 # Lê tudo o que o Painel mostra, sem tocar na tela: roda em segundo plano (Start-InfoLoad) para a janela não travar
@@ -2894,6 +2894,8 @@ function Get-PcData {
     $d.Cs  = Get-CimInstance Win32_ComputerSystem
     $d.Cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
     $d.Cv  = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+    # InfoStep: etapa atual, mostrada na lista de carregamento do Painel
+    $sync.InfoStep = 1
     $d.Disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
     try {
         $dn = (Get-Partition -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction Stop).DiskNumber
@@ -2901,11 +2903,14 @@ function Get-PcData {
         $d.Pd  = $d.AllPd | Where-Object { $_.DeviceId -eq "$dn" } | Select-Object -First 1
         $d.Rel = $d.Pd | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
     } catch {}
+    $sync.InfoStep = 2
     $d.Gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'Remote|Virtual|Parsec|Mirage|DisplayLink|Meta ' })
     $d.Res  = @(Get-CimInstance CIM_VideoControllerResolution -ErrorAction SilentlyContinue)
+    $sync.InfoStep = 3
     $d.Mp   = try { Get-MpComputerStatus -ErrorAction Stop } catch { $null }
     $d.RebootPending = (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or
                        (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')
+    $sync.InfoStep = 4
     $d.Bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($Global:IsLaptop) {
         try {
@@ -2926,7 +2931,9 @@ $infoWorker = {
         . ([scriptblock]::Create($LibText))
         . ([scriptblock]::Create($FnText))
         $sync.InfoData = Get-PcData
+        $sync.InfoStep = 5
         $sync.UsageData = Get-UsageGuess
+        $sync.InfoStep = 6
     } catch {
         $sync.InfoError = $_.Exception.Message
     } finally {
@@ -2934,16 +2941,98 @@ $infoWorker = {
     }
 }
 
+# ---------------------------------------------------------------- carregamento animado
+# Enquanto lê: o anel da nota vira uma barra de progresso e o Diagnóstico mostra cada etapa sendo conferida
+$InfoSteps = 'Sistema e processador', 'Disco e saúde do SSD', 'Placa de vídeo e monitor', 'Antivírus e atualizações',
+             'Energia e bateria', 'Jogos e programas instalados'
+
+# anel de 0 a 100 (circunferência em unidades de espessura do traço: pi * (132 - 11) / 11)
+function Set-Ring([double]$Pct) {
+    $ui.ScoreRing.StrokeDashArray = New-Object Windows.Media.DoubleCollection (,[double[]]@((([math]::PI * 121 / 11) * $Pct / 100), 1000))
+}
+
+function Show-LoadSteps {
+    $ui.PanelDiag.Children.Clear()
+    $script:LoadRows = @()
+    foreach ($name in $InfoSteps) {
+        $x = @"
+<DockPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Margin="0,0,0,7" Opacity="0.45">
+  <TextBlock Text="&#xE91F;" FontFamily="Segoe MDL2 Assets" FontSize="13" Width="16" Foreground="#5B6275" Margin="0,2,12,0" RenderTransformOrigin="0.5,0.5">
+    <TextBlock.RenderTransform><RotateTransform/></TextBlock.RenderTransform>
+  </TextBlock>
+  <TextBlock DockPanel.Dock="Right" Text="" FontSize="12" Foreground="#8A91A3" Margin="12,1,0,0"/>
+  <TextBlock Text="$(Esc $name)" Foreground="#D5D9E3" FontSize="13"/>
+</DockPanel>
+"@
+        $row = [Windows.Markup.XamlReader]::Parse($x)
+        [void]$ui.PanelDiag.Children.Add($row)
+        $script:LoadRows += $row
+    }
+    $script:LoadStepShown = -1
+}
+
+# Marca as etapas já feitas, a atual (ícone girando) e as que faltam
+function Update-LoadSteps([int]$Step) {
+    for ($i = 0; $i -lt $script:LoadRows.Count; $i++) {
+        $row = $script:LoadRows[$i]; $icon = $row.Children[0]; $tag = $row.Children[1]
+        if ($i -lt $Step -and $tag.Text -ne 'ok') {
+            $icon.BeginAnimation([Windows.Controls.TextBlock]::OpacityProperty, $null)
+            $icon.RenderTransform.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, $null)
+            $icon.RenderTransform.Angle = 0
+            $icon.Text = [string][char]0xE73E; $icon.Foreground = '#4ADE80'
+            $tag.Text = 'ok'; $tag.Foreground = '#4ADE80'
+            $row.Opacity = 1
+        } elseif ($i -eq $Step -and $tag.Text -ne 'lendo...') {
+            $icon.Text = [string][char]0xE72C; $icon.Foreground = '#A99BFF'
+            $spin = New-Object Windows.Media.Animation.DoubleAnimation 0, 360, ([TimeSpan]::FromSeconds(1.1))
+            $spin.RepeatBehavior = [Windows.Media.Animation.RepeatBehavior]::Forever
+            $icon.RenderTransform.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, $spin)
+            $tag.Text = 'lendo...'; $tag.Foreground = '#A99BFF'
+            $row.Opacity = 1
+        }
+    }
+}
+
+# Um só temporizador rápido anima o anel: no carregamento ele avança com as etapas (e um pouco dentro de cada uma,
+# para nunca parecer travado); depois sobe suave até a nota final
+$script:RingShown = 0.0
+# prioridade Normal: na padrão (Background) ele fica sem vez enquanto a tela monta os cartões e a nota para no meio
+$ringTimer = New-Object Windows.Threading.DispatcherTimer ([Windows.Threading.DispatcherPriority]::Normal)
+$ringTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+$ringTimer.Add_Tick({
+    if ($script:RingMode -eq 'load') {
+        $step = [int]$sync.InfoStep
+        if ($step -ne $script:LoadStepShown) {
+            $script:LoadStepShown = $step; $script:StepT0 = Get-Date
+            Update-LoadSteps $step
+            if ($step -lt $InfoSteps.Count) { $ui.ScoreLabel.Text = 'Analisando'; if (-not $sync.Running) { $ui.StatusText.Text = "Lendo: $($InfoSteps[$step])..." } }
+        }
+        $t = ((Get-Date) - $script:StepT0).TotalSeconds
+        $target = 100.0 * ([math]::Min($step, $InfoSteps.Count) + 0.85 * (1 - [math]::Exp(-$t / 1.2))) / $InfoSteps.Count
+        $script:RingShown += ([math]::Min(100.0, $target) - $script:RingShown) * 0.15
+        $ui.ScoreText.Text = '{0:N0}%' -f $script:RingShown
+        $ui.ScoreText.FontSize = 30
+        if (-not $sync.Running) { $ui.Progress.Value = $script:RingShown }
+    } else {
+        $script:RingShown += ($script:RingTarget - $script:RingShown) * 0.12
+        if ([math]::Abs($script:RingTarget - $script:RingShown) -lt 0.4) { $script:RingShown = [double]$script:RingTarget; $ringTimer.Stop() }
+        $ui.ScoreText.Text = '{0:N0}' -f $script:RingShown
+    }
+    Set-Ring $script:RingShown
+})
+
 function Start-InfoLoad {
     if ($sync.InfoBusy) { return }
-    $sync.InfoBusy = $true; $sync.InfoDone = $false; $sync.InfoError = $null
+    $sync.InfoBusy = $true; $sync.InfoDone = $false; $sync.InfoError = $null; $sync.InfoStep = 0
     if (-not $script:InfoLoadedOnce) {
-        $ui.TxtHost.Text = 'Lendo as informações do computador...'
-        $ui.PanelDiag.Children.Clear()
-        $tb = New-Object Windows.Controls.TextBlock
-        $tb.Text = 'Lendo as informações do computador...'; $tb.Foreground = '#8A91A3'; $tb.FontSize = 13
-        [void]$ui.PanelDiag.Children.Add($tb)
+        $ui.TxtHost.Text = 'Conferindo o computador, leva só alguns segundos...'
+        # modos ficam esperando a detecção de uso: assim ninguém aplica um modo antes de saber para que o PC serve
+        $ui.PanelModes.Opacity = 0.45; $ui.PanelModes.IsHitTestVisible = $false; $ui.BtnUsage.IsEnabled = $false
     }
+    Show-LoadSteps
+    $ui.ScoreLabel.Foreground = '#A99BFF'; $ui.ScoreRing.Stroke = '#7C5CFF'
+    $script:RingShown = 0.0; $script:RingMode = 'load'
+    $ringTimer.Start()
     $fns = 'Get-PcData', 'Get-InstalledNames', 'ConvertFrom-Rot13', 'Get-FriendlyApp', 'Get-InstalledGames', 'Get-AppUsage', 'Get-UsageGuess' |
            ForEach-Object { (Get-Item "function:$_").ScriptBlock.Ast.Extent.Text }
     $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
@@ -2955,13 +3044,17 @@ function Start-InfoLoad {
 function Complete-InfoLoad {
     $sync.InfoBusy = $false
     try { [void]$script:infoJob.PS.EndInvoke($script:infoJob.H); $script:infoJob.PS.Runspace.Dispose(); $script:infoJob.PS.Dispose() } catch {}
+    if (-not $sync.Running) { $ui.Progress.Value = 0 }
+    $ui.ScoreText.FontSize = 40
+    $script:RingShown = 0.0
     Update-Info $sync.InfoData
     if (-not $script:InfoLoadedOnce) {
         $script:InfoLoadedOnce = $true
+        $ui.PanelModes.Opacity = 1; $ui.PanelModes.IsHitTestVisible = $true; $ui.BtnUsage.IsEnabled = $true
         # primeira vez: com os dados de uso prontos, indica o modo (e pergunta, se ainda não perguntou)
         Initialize-Usage -Guess $sync.UsageData
         $ui.StatusText.Text = 'Pronto. Escolha um modo no Painel.'
-    }
+    } elseif (-not $sync.Running) { $ui.StatusText.Text = 'Informações atualizadas.' }
 }
 
 # Desenha o Painel com os dados já lidos (rápido: nada de consulta ao Windows aqui)
