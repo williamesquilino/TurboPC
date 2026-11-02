@@ -25,7 +25,7 @@ param(
 
 $AppName    = 'TurboPC'
 $AppAuthor  = 'William Silva Esquilino'
-$AppVersion = '1.10.0'
+$AppVersion = '1.10.1'
 
 # Quando compilado com ps2exe: um .exe com "Auto" no nome roda direto um modo (o nome do arquivo diz qual).
 $ExePath    = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
