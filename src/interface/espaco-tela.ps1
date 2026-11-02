@@ -39,7 +39,7 @@ function Get-RecycleCapacity([string]$Path) {
     $drive = [IO.Path]::GetPathRoot($Path).TrimEnd('\')
     $vol = Get-CimInstance Win32_Volume -Filter "DriveLetter='$drive'" -ErrorAction SilentlyContinue | Select-Object -First 1
     $guid = if ($vol) { [regex]::Match($vol.DeviceID, '\{[0-9a-fA-F-]+\}').Value }
-    $cfg = if ($guid) { Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\$guid" -ErrorAction SilentlyContinue }
+    $cfg = if ($guid) { Get-ItemProperty (Resolve-UserPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\$guid") -ErrorAction SilentlyContinue }
     if ($cfg.NukeOnDelete -eq 1) { return [int64]0 }
     if ($cfg.MaxCapacity) { return [int64]$cfg.MaxCapacity * 1MB }
     if ($vol) { [int64]($vol.Capacity * 0.05) } else { [int64]0 }

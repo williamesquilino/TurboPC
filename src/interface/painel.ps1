@@ -34,7 +34,8 @@ function Update-Info {
         $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
         $cv  = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
 
-        $ui.TxtHost.Text = "$($cs.Manufacturer) $($cs.Model)  •  $env:COMPUTERNAME  •  executando como $env:USERDOMAIN\$env:USERNAME"
+        $who = if ($Global:UserHive) { "aplicado por $($Global:RunAs) no usuário $($Global:TargetUser)" } else { "executando como $($Global:RunAs)" }
+        $ui.TxtHost.Text = "$($cs.Manufacturer) $($cs.Model)  •  $env:COMPUTERNAME  •  $who"
 
         $ui.InfoOS.Text = ($os.Caption -replace '^Microsoft\s+', '')
         $ui.InfoOSSub.Text = "Versão $($cv.DisplayVersion)  •  build $($os.BuildNumber).$($cv.UBR)"
@@ -161,13 +162,15 @@ function Update-Info {
         $enabledStartup = @($script:StartupBoxes | Where-Object { $_.IsChecked }).Count
         if ($enabledStartup -gt 8) { Add-Diag "$enabledStartup programas abrem junto com o Windows. Veja Programas > Inicialização." $yellow; $issues++ }
 
-        $exp = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($exp) {
-            $own = Invoke-CimMethod -InputObject $exp -MethodName GetOwner -ErrorAction SilentlyContinue
-            if ($own -and $own.User -and $own.User -ne $env:USERNAME) {
-                Add-Diag "O app está rodando como '$env:USERNAME', mas quem está logado é '$($own.User)'. Os ajustes visuais e de usuário vão para '$env:USERNAME'. Para aplicar no usuário, rode logado com uma conta que seja admin local." $yellow
-                $issues++
-            }
+        # senha de admin do técnico com outra pessoa logada: os ajustes de usuário vão para quem está na tela
+        if ($Global:UserHive) {
+            Add-Diag "Rodando com a conta de admin '$($Global:RunAs)'. Os ajustes de usuário (visual, mouse, Iniciar, extensões...) vão para quem está logado: '$($Global:TargetUser)'. Os programas são instalados para todos os usuários." $blue
+        } elseif (-not $Global:SessionUser) {
+            Add-Diag "Ninguém está logado na tela (acesso remoto?): os ajustes de usuário vão para a conta '$($Global:RunAs)'." $yellow
+        }
+        if ($Global:IsDomain) {
+            $dom = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Domain
+            Add-Diag "PC no domínio '$dom'. As políticas da empresa (GPO) mandam no que configuram: se alguma delas mexer na mesma coisa, a da empresa vale. Por isso os ajustes de navegador e de atualizações entre PCs ficam fora dos modos aqui." $blue
         }
         if ($issues -eq 0) { Add-Diag 'Nada crítico encontrado. Use o modo Recomendado de vez em quando para manter tudo em dia.' $green }
     } catch {

@@ -211,7 +211,7 @@ $diskWorker = {
         # jogos (tamanho real informado pela Steam e pela Epic)
         $sync.DiskStatus = 'Vendo jogos e programas...'
         $games = @()
-        $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+        $steam = @(Get-ItemProperty 'Registry::HKEY_USERS\*\Software\Valve\Steam' -ErrorAction SilentlyContinue | Where-Object SteamPath | ForEach-Object SteamPath) | Select-Object -First 1
         if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
         if ($steam -and (Test-Path "$steam\steamapps")) {
             $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' })

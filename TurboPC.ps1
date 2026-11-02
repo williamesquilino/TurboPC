@@ -25,7 +25,7 @@ param(
 
 $AppName    = 'TurboPC'
 $AppAuthor  = 'William Silva Esquilino'
-$AppVersion = '1.8.0'
+$AppVersion = '1.9.0'
 
 # Quando compilado com ps2exe: um .exe com "Auto" no nome roda direto um modo (o nome do arquivo diz qual).
 $ExePath    = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -68,6 +68,41 @@ $TaskLibrary = {
     $gpuNames = (Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | ForEach-Object Name) -join ' '
     $Global:HasNvidia  = $gpuNames -match 'NVIDIA'
     $Global:HasAmd     = $gpuNames -match 'AMD|Radeon'
+    $Global:IsDomain   = [bool](Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).PartOfDomain
+
+    # ---- usuário logado x conta que executa
+    # Em PC de empresa o técnico digita a senha de admin dele: o app roda como o técnico, mas os ajustes "de usuário"
+    # (HKCU) têm que ir para quem está logado na tela. Resolve-UserPath troca HKCU:\ pelo registro dessa pessoa.
+    function Get-SessionUser {
+        $console = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).UserName   # DOMINIO\usuario na tela
+        foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue)) {
+            $o = Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction SilentlyContinue
+            if (-not $o -or -not $o.User) { continue }
+            $full = "$($o.Domain)\$($o.User)"
+            if ($console -and $full -ne $console) { continue }
+            $sid = (Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid
+            if ($sid) { return [pscustomobject]@{ Name = $full; Sid = $sid } }
+        }
+        $null
+    }
+    $Global:RunAs       = "$env:USERDOMAIN\$env:USERNAME"
+    $Global:SessionUser = Get-SessionUser
+    $Global:UserHive    = $null
+    if ($Global:SessionUser -and $Global:SessionUser.Sid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value -and
+        (Test-Path "Registry::HKEY_USERS\$($Global:SessionUser.Sid)")) {
+        $Global:UserHive = $Global:SessionUser.Sid
+    }
+    $Global:TargetUser    = if ($Global:SessionUser) { $Global:SessionUser.Name } else { $Global:RunAs }
+    $Global:TargetProfile = if ($Global:UserHive) { (Get-CimInstance Win32_UserProfile -Filter "SID='$($Global:UserHive)'" -ErrorAction SilentlyContinue).LocalPath } else { $env:USERPROFILE }
+    if (-not $Global:TargetProfile) { $Global:TargetProfile = $env:USERPROFILE }
+
+    function Resolve-UserPath([string]$Path) {
+        if (-not $Global:UserHive -or $Path -notmatch '^HKCU:\\') { return $Path }
+        $rest = $Path.Substring(6)
+        # HKCU\Software\Classes fica num arquivo separado do perfil (SID_Classes)
+        if ($rest -match '^Software\\Classes(\\|$)') { return "Registry::HKEY_USERS\$($Global:UserHive)_Classes$($rest.Substring(16))" }
+        "Registry::HKEY_USERS\$($Global:UserHive)\$rest"
+    }
 
     function Write-TLog {
         param([string]$Message, [string]$Level = 'INFO')
@@ -93,10 +128,12 @@ $TaskLibrary = {
 
     function Set-Reg {
         param([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord')
+        $Path = Resolve-UserPath $Path
         if ($null -ne $Global:UndoItems -and -not $Global:UndoSeen.ContainsKey("$Path|$Name")) {
             $vn = if ($Name -eq '(default)') { '' } else { $Name }
             $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
-            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false }
+            # KX: a chave já existia? Se foi o TurboPC que criou, o desfazer apaga a chave inteira
+            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key }
             if ($key -and ($key.GetValueNames() -contains $vn)) {
                 $rec.E = $true
                 $rec.K = "$($key.GetValueKind($vn))"
@@ -209,7 +246,7 @@ $TaskLibrary = {
     # Executáveis de jogos instalados pela Steam e pela Epic
     function Get-GameExes {
         $dirs = @()
-        $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+        $steam = (Get-ItemProperty (Resolve-UserPath 'HKCU:\Software\Valve\Steam') -ErrorAction SilentlyContinue).SteamPath
         if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
         if ($steam -and (Test-Path "$steam\steamapps\libraryfolders.vdf")) {
             $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' })
@@ -786,7 +823,7 @@ $TaskLibrary = {
             Name='Jogos sempre na placa de vídeo dedicada'
             Desc='Marca os jogos da Steam e da Epic como "Alto desempenho" nas configurações de gráficos do Windows (em notebook, impede o jogo de rodar no vídeo integrado) e liga as otimizações para jogos em janela do Windows 11.'
             Action={
-                $k = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+                $k = Resolve-UserPath 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
                 $cur = [string](Get-ItemProperty $k -Name DirectXUserGlobalSettings -ErrorAction SilentlyContinue).DirectXUserGlobalSettings
                 $opts = [ordered]@{}
                 foreach ($kv in ($cur -split ';' | Where-Object { $_ -match '=' })) { $a = $kv -split '=', 2; $opts[$a[0]] = $a[1] }
@@ -1001,6 +1038,16 @@ $TaskLibrary = {
         }
     }
 
+    # PC no domínio: política de navegador e atualizações entre PCs costumam ser da TI da empresa (GPO, WSUS, cache de rede)
+    if ($Global:IsDomain) {
+        $DomainIds = 'browserbg', 'deliveryp2p'
+        foreach ($name in @($Global:Modes.Keys)) {
+            $m = $Global:Modes[$name]
+            $m.Extras = @($m.Extras) + @($m.Ids | Where-Object { $DomainIds -contains $_ }) | Select-Object -Unique
+            $m.Ids    = @($m.Ids | Where-Object { $DomainIds -notcontains $_ })
+        }
+    }
+
     # na ordem das abas, sem repetidos e sem o que não existe
     function Get-ProfileIds([string]$Name) {
         $ids = $Global:Modes[$Name].Ids
@@ -1022,7 +1069,9 @@ $TaskLibrary = {
         $Global:UndoItems = New-Object Collections.ArrayList
         $Global:UndoNotes = New-Object Collections.ArrayList
         $Global:UndoSeen  = @{}
-        Write-TLog "==== $Label | $env:COMPUTERNAME | $($sel.Count) tarefa(s) | usuário $env:USERNAME ====" 'STEP'
+        Write-TLog "==== $Label | $env:COMPUTERNAME | $($sel.Count) tarefa(s) | executado por $Global:RunAs ====" 'STEP'
+        if ($Global:UserHive) { Write-TLog "  ajustes de usuário vão para quem está logado: $Global:TargetUser" }
+        elseif (-not $Global:SessionUser) { Write-TLog '  ninguém logado na tela: ajustes de usuário vão para a conta que executou' 'WARN' }
 
         if ($RestorePoint) {
             if ($OnProgress) { & $OnProgress 0 'Criando ponto de restauração...' }
@@ -1047,7 +1096,7 @@ $TaskLibrary = {
                 New-Item -ItemType Directory -Path $Global:UndoDir -Force | Out-Null
                 $file = Join-Path $Global:UndoDir ('{0}.json' -f (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'))
                 [ordered]@{
-                    Date = (Get-Date).ToString('s'); Label = $Label; User = "$env:USERDOMAIN\$env:USERNAME"; Version = 1
+                    Date = (Get-Date).ToString('s'); Label = $Label; User = $Global:RunAs; Target = $Global:TargetUser; Version = 1
                     Tasks = @($sel | ForEach-Object Name); Items = @($Global:UndoItems); Notes = @($Global:UndoNotes); Undone = $null
                 } | ConvertTo-Json -Depth 6 | Set-Content -Path $file -Encoding UTF8
                 Write-TLog "  $($Global:UndoItems.Count) alteração(ões) guardada(s): dá para desfazer em Histórico" 'OK'
@@ -1070,6 +1119,9 @@ $TaskLibrary = {
         $rec = Get-Content $File -Raw -Encoding UTF8 | ConvertFrom-Json
         $items = @($rec.Items)
         [array]::Reverse($items)
+        # ajustes de usuário de outra pessoa só voltam com ela logada (o registro dela precisa estar carregado)
+        $away = @($items | Where-Object { $_.T -eq 'reg' -and $_.P -match '^Registry::HKEY_USERS\\(S-[\d-]+)' -and -not (Test-Path "Registry::HKEY_USERS\$($Matches[1])") })
+        if ($away) { Write-TLog "  $($away.Count) ajuste(s) de usuário são de $($rec.Target), que não está logado agora: entre com esse usuário e desfaça de novo para voltar esses também" 'WARN' }
         Write-TLog "==== Desfazendo: $($rec.Label) de $(([datetime]$rec.Date).ToString('dd/MM/yyyy HH:mm')) ($($items.Count) alterações) ====" 'STEP'
         $ok = 0; $fail = 0; $i = 0
         foreach ($it in $items) {
@@ -1089,7 +1141,18 @@ $TaskLibrary = {
                             if (-not (Test-Path -LiteralPath $it.P)) { New-Item -Path $it.P -Force | Out-Null }
                             New-ItemProperty -LiteralPath $it.P -Name $it.N -Value $val -PropertyType $it.K -Force -ErrorAction Stop | Out-Null
                         } elseif (Test-Path -LiteralPath $it.P) {
-                            Remove-ItemProperty -LiteralPath $it.P -Name $it.N -ErrorAction SilentlyContinue
+                            $k = Get-Item -LiteralPath $it.P
+                            if ($it.PSObject.Properties.Name -contains 'KX' -and -not $it.KX -and $k.SubKeyCount -eq 0 -and $k.ValueCount -le 1) {
+                                # chave criada pelo TurboPC e sem mais nada dentro: sai inteira (ex.: menu de clique direito clássico)
+                                Remove-Item -LiteralPath $it.P -Force -ErrorAction Stop
+                            } else {
+                                # pelo .NET porque o Remove-ItemProperty não apaga o valor "(padrão)" de uma chave
+                                $hives = @{ HKEY_LOCAL_MACHINE = [Microsoft.Win32.Registry]::LocalMachine; HKEY_USERS = [Microsoft.Win32.Registry]::Users; HKEY_CURRENT_USER = [Microsoft.Win32.Registry]::CurrentUser }
+                                $full = $k.Name   # ex.: HKEY_USERS\S-1-5-...\Software\...
+                                $root, $sub = $full -split '\\', 2
+                                $w = $hives[$root].OpenSubKey($sub, $true)
+                                if ($w) { $w.DeleteValue($(if ($it.N -eq '(default)') { '' } else { $it.N }), $false); $w.Close() }
+                            }
                         }
                     }
                     'svc' {
@@ -2195,7 +2258,7 @@ function ConvertFrom-Rot13([string]$s) {
 # Nomes dos jogos instalados (Steam, Epic, Riot e lista de programas instalados)
 function Get-InstalledGames {
     $names = @()
-    $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+    $steam = (Get-ItemProperty (Resolve-UserPath 'HKCU:\Software\Valve\Steam') -ErrorAction SilentlyContinue).SteamPath
     if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
     if ($steam -and (Test-Path "$steam\steamapps")) {
         $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' -ErrorAction SilentlyContinue |
@@ -2232,7 +2295,8 @@ function Get-AppUsage {
     $work = 'winword|excel|powerpnt|outlook|onenote|teams|acrord32|acrobat|zoom|slack|mstsc|sapgui|anydesk|libreoffice|soffice'
     $game = 'steam|riotclient|valorant|leagueclient|epicgames|battle\.net|eadesktop|upc\.exe|ubisoft|discord|obs64|cs2|fortnite|gog'
     $r = [pscustomobject]@{ Work = 0; Game = 0; WorkApps = @(); GameApps = @() }
-    $key = Get-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count' -ErrorAction SilentlyContinue
+    # o contador de quem está logado na tela (não o do técnico que digitou a senha de admin)
+    $key = Get-Item (Resolve-UserPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count') -ErrorAction SilentlyContinue
     if (-not $key) { return $r }
     foreach ($n in $key.GetValueNames()) {
         $d = $key.GetValue($n)
@@ -2708,8 +2772,11 @@ function Update-PcBanner([string]$Hardware) {
 # ---------------------------------------------------------------- inicialização (startup)
 function Get-StartupEntries {
     $base = 'Software\Microsoft\Windows\CurrentVersion'
+    # "do usuário" é de quem está logado na tela, mesmo se o app roda com a senha de admin do técnico
+    $userLabel = "Usuário $(($Global:TargetUser -split '\\')[-1])"
+    $userStartup = if ($Global:UserHive) { "$($Global:TargetProfile)\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" } else { [Environment]::GetFolderPath('Startup') }
     $sources = @(
-        @{ Run="HKCU:\$base\Run";                               Approved="HKCU:\$base\Explorer\StartupApproved\Run";   Scope='Usuário atual' },
+        @{ Run=(Resolve-UserPath "HKCU:\$base\Run"); Approved=(Resolve-UserPath "HKCU:\$base\Explorer\StartupApproved\Run"); Scope=$userLabel },
         @{ Run="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run";             Approved="HKLM:\$base\Explorer\StartupApproved\Run";   Scope='Todos os usuários' },
         @{ Run="HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run"; Approved="HKLM:\$base\Explorer\StartupApproved\Run32"; Scope='Todos os usuários' }
     )
@@ -2723,7 +2790,7 @@ function Get-StartupEntries {
         }
     }
     $folders = @(
-        @{ Path=[Environment]::GetFolderPath('Startup');       Approved="HKCU:\$base\Explorer\StartupApproved\StartupFolder"; Scope='Usuário atual' },
+        @{ Path=$userStartup; Approved=(Resolve-UserPath "HKCU:\$base\Explorer\StartupApproved\StartupFolder"); Scope=$userLabel },
         @{ Path=[Environment]::GetFolderPath('CommonStartup'); Approved="HKLM:\$base\Explorer\StartupApproved\StartupFolder"; Scope='Todos os usuários' }
     )
     foreach ($f in $folders) {
@@ -2813,7 +2880,8 @@ function Update-Info {
         $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
         $cv  = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
 
-        $ui.TxtHost.Text = "$($cs.Manufacturer) $($cs.Model)  •  $env:COMPUTERNAME  •  executando como $env:USERDOMAIN\$env:USERNAME"
+        $who = if ($Global:UserHive) { "aplicado por $($Global:RunAs) no usuário $($Global:TargetUser)" } else { "executando como $($Global:RunAs)" }
+        $ui.TxtHost.Text = "$($cs.Manufacturer) $($cs.Model)  •  $env:COMPUTERNAME  •  $who"
 
         $ui.InfoOS.Text = ($os.Caption -replace '^Microsoft\s+', '')
         $ui.InfoOSSub.Text = "Versão $($cv.DisplayVersion)  •  build $($os.BuildNumber).$($cv.UBR)"
@@ -2940,13 +3008,15 @@ function Update-Info {
         $enabledStartup = @($script:StartupBoxes | Where-Object { $_.IsChecked }).Count
         if ($enabledStartup -gt 8) { Add-Diag "$enabledStartup programas abrem junto com o Windows. Veja Programas > Inicialização." $yellow; $issues++ }
 
-        $exp = Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($exp) {
-            $own = Invoke-CimMethod -InputObject $exp -MethodName GetOwner -ErrorAction SilentlyContinue
-            if ($own -and $own.User -and $own.User -ne $env:USERNAME) {
-                Add-Diag "O app está rodando como '$env:USERNAME', mas quem está logado é '$($own.User)'. Os ajustes visuais e de usuário vão para '$env:USERNAME'. Para aplicar no usuário, rode logado com uma conta que seja admin local." $yellow
-                $issues++
-            }
+        # senha de admin do técnico com outra pessoa logada: os ajustes de usuário vão para quem está na tela
+        if ($Global:UserHive) {
+            Add-Diag "Rodando com a conta de admin '$($Global:RunAs)'. Os ajustes de usuário (visual, mouse, Iniciar, extensões...) vão para quem está logado: '$($Global:TargetUser)'. Os programas são instalados para todos os usuários." $blue
+        } elseif (-not $Global:SessionUser) {
+            Add-Diag "Ninguém está logado na tela (acesso remoto?): os ajustes de usuário vão para a conta '$($Global:RunAs)'." $yellow
+        }
+        if ($Global:IsDomain) {
+            $dom = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Domain
+            Add-Diag "PC no domínio '$dom'. As políticas da empresa (GPO) mandam no que configuram: se alguma delas mexer na mesma coisa, a da empresa vale. Por isso os ajustes de navegador e de atualizações entre PCs ficam fora dos modos aqui." $blue
         }
         if ($issues -eq 0) { Add-Diag 'Nada crítico encontrado. Use o modo Recomendado de vez em quando para manter tudo em dia.' $green }
     } catch {
@@ -2988,10 +3058,24 @@ pre{background:#0e1117;color:#c9d1e0;padding:16px;border-radius:12px;white-space
 <h2>O que foi feito nesta sessão</h2><pre>$(& $h $(if ($ui.LogBox.Text) { $ui.LogBox.Text } else { 'Nenhuma otimização executada ainda.' }))</pre>
 </div></body></html>
 "@
-    $file = Join-Path ([Environment]::GetFolderPath('Desktop')) ('Relatorio_TurboPC_{0}_{1}.html' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd_HH-mm'))
-    [IO.File]::WriteAllText($file, $html, (New-Object Text.UTF8Encoding $true))
-    Write-TLog "Relatório salvo em $file" 'OK'
+    $name = 'Relatorio_TurboPC_{0}_{1}.html' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd_HH-mm')
+    # uma cópia fica sempre no PC, num lugar fixo para o técnico achar depois
+    $keep = Join-Path $env:ProgramData 'TurboPC\relatorios'
+    New-Item -ItemType Directory -Path $keep -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $keep $name), $html, (New-Object Text.UTF8Encoding $true))
+    $file = Join-Path (Get-UserDesktop) $name
+    try { [IO.File]::WriteAllText($file, $html, (New-Object Text.UTF8Encoding $true)) } catch { $file = Join-Path $keep $name }
+    Write-TLog "Relatório salvo em $file (cópia em $keep)" 'OK'
     Start-Process $file
+}
+
+# Área de Trabalho de quem está logado (pode estar no OneDrive); sem outro usuário, a da conta atual
+function Get-UserDesktop {
+    if (-not $Global:UserHive) { return [Environment]::GetFolderPath('Desktop') }
+    $key = Get-Item (Resolve-UserPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders') -ErrorAction SilentlyContinue
+    $raw = if ($key) { [string]$key.GetValue('Desktop', $null, 'DoNotExpandEnvironmentNames') }
+    $path = if ($raw) { $raw -replace '%USERPROFILE%', $Global:TargetProfile } else { "$($Global:TargetProfile)\Desktop" }
+    if (Test-Path -LiteralPath $path) { $path } else { "$($Global:TargetProfile)\Desktop" }
 }
 
 # ---------------------------------------------------------------- monitor em tempo real
@@ -3514,7 +3598,7 @@ $diskWorker = {
         # jogos (tamanho real informado pela Steam e pela Epic)
         $sync.DiskStatus = 'Vendo jogos e programas...'
         $games = @()
-        $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+        $steam = @(Get-ItemProperty 'Registry::HKEY_USERS\*\Software\Valve\Steam' -ErrorAction SilentlyContinue | Where-Object SteamPath | ForEach-Object SteamPath) | Select-Object -First 1
         if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
         if ($steam -and (Test-Path "$steam\steamapps")) {
             $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' })
@@ -3651,7 +3735,7 @@ function Get-RecycleCapacity([string]$Path) {
     $drive = [IO.Path]::GetPathRoot($Path).TrimEnd('\')
     $vol = Get-CimInstance Win32_Volume -Filter "DriveLetter='$drive'" -ErrorAction SilentlyContinue | Select-Object -First 1
     $guid = if ($vol) { [regex]::Match($vol.DeviceID, '\{[0-9a-fA-F-]+\}').Value }
-    $cfg = if ($guid) { Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\$guid" -ErrorAction SilentlyContinue }
+    $cfg = if ($guid) { Get-ItemProperty (Resolve-UserPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\$guid") -ErrorAction SilentlyContinue }
     if ($cfg.NukeOnDelete -eq 1) { return [int64]0 }
     if ($cfg.MaxCapacity) { return [int64]$cfg.MaxCapacity * 1MB }
     if ($vol) { [int64]($vol.Capacity * 0.05) } else { [int64]0 }
@@ -4375,8 +4459,13 @@ $appWorker = {
                 Log "> $verb $($a.Name)" 'STEP'
                 $done = $false
                 if ($winget -and $a.Winget) {
-                    $c = if ($action -eq 'uninstall') { Run-Winget "uninstall --id $($a.Winget) -e --silent" }
-                         else { Run-Winget "install --id $($a.Winget) -e --source $($a.Source) --silent --accept-package-agreements" }
+                    if ($action -eq 'uninstall') { $c = Run-Winget "uninstall --id $($a.Winget) -e --silent" }
+                    else {
+                        # para todos os usuários do PC: com a senha de admin do técnico, "só para este usuário" instalaria na conta do técnico
+                        $install = "install --id $($a.Winget) -e --source $($a.Source) --silent --accept-package-agreements"
+                        $c = Run-Winget "$install --scope machine"
+                        if ($okCodes -notcontains $c) { Log '  o programa não instala para todos os usuários; tentando só para este usuário...'; $c = Run-Winget $install }
+                    }
                     if ($okCodes -contains $c) { $done = $true } else { Log "  winget não conseguiu (código $c)" 'WARN' }
                 }
                 if (-not $done -and $useChoco -and $a.Choco) {

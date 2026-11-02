@@ -199,8 +199,13 @@ $appWorker = {
                 Log "> $verb $($a.Name)" 'STEP'
                 $done = $false
                 if ($winget -and $a.Winget) {
-                    $c = if ($action -eq 'uninstall') { Run-Winget "uninstall --id $($a.Winget) -e --silent" }
-                         else { Run-Winget "install --id $($a.Winget) -e --source $($a.Source) --silent --accept-package-agreements" }
+                    if ($action -eq 'uninstall') { $c = Run-Winget "uninstall --id $($a.Winget) -e --silent" }
+                    else {
+                        # para todos os usuários do PC: com a senha de admin do técnico, "só para este usuário" instalaria na conta do técnico
+                        $install = "install --id $($a.Winget) -e --source $($a.Source) --silent --accept-package-agreements"
+                        $c = Run-Winget "$install --scope machine"
+                        if ($okCodes -notcontains $c) { Log '  o programa não instala para todos os usuários; tentando só para este usuário...'; $c = Run-Winget $install }
+                    }
                     if ($okCodes -contains $c) { $done = $true } else { Log "  winget não conseguiu (código $c)" 'WARN' }
                 }
                 if (-not $done -and $useChoco -and $a.Choco) {

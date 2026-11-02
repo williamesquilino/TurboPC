@@ -133,12 +133,20 @@ Por segurança, só dá para apagar dentro das pastas da pessoa (Downloads, Docu
 - Não mexe em arquivos de usuários, senhas ou favoritos.
 - Não aplica "tweaks milagrosos" de registro que não têm efeito real ou deixam o sistema instável.
 
-## Atenção: conta de administrador diferente
+## PC de empresa (domínio) e senha de admin do técnico
 
-Ajustes "de usuário" (efeitos visuais, transparência, sugestões, Bing no Iniciar) valem para a conta que **executou** o app.
-Se o funcionário não é admin e você digita a senha de outra conta de admin, esses ajustes vão para a conta do admin. O Painel avisa quando isso acontece.
-As limpezas e os ajustes do sistema valem para o PC inteiro de qualquer forma.
+Quando o funcionário está logado e o técnico digita a senha de admin dele, o TurboPC roda como o técnico, mas:
 
+- os **ajustes de usuário** (visual, mouse, Iniciar, extensões, Num Lock...) vão para **quem está logado na tela**, não para a conta do técnico;
+- a aba **Inicialização** mostra e muda os programas do funcionário;
+- os **programas** são instalados **para todos os usuários do PC** (se um programa não aceitar, ele instala só para o usuário atual);
+- o **relatório** vai para a Área de Trabalho do funcionário, com uma cópia em `C:\ProgramData\TurboPC\relatorios`;
+- a detecção de uso olha os programas que **o funcionário** mais usa;
+- o Painel mostra no topo "aplicado por (admin) no usuário (funcionário)".
+
+O **Desfazer** volta os ajustes do funcionário se ele estiver logado. Se não estiver, o app avisa para entrar com esse usuário e desfazer de novo.
+
+Em **PC no domínio**, as políticas da empresa (GPO) mandam no que configuram. Os ajustes de política do Edge/Chrome e de atualizações entre PCs ficam **fora dos modos** (aparecem só como extras), porque costumam ser definidos pela TI. Sem ninguém logado na tela (acesso remoto ou modo sem janela por GPO/RMM), os ajustes de usuário vão para a conta que executou, e o log avisa.
 ## Vários PCs de uma vez (sem janela)
 
 ```

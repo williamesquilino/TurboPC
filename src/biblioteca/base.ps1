@@ -8,6 +8,41 @@ $TaskLibrary = {
     $gpuNames = (Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | ForEach-Object Name) -join ' '
     $Global:HasNvidia  = $gpuNames -match 'NVIDIA'
     $Global:HasAmd     = $gpuNames -match 'AMD|Radeon'
+    $Global:IsDomain   = [bool](Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).PartOfDomain
+
+    # ---- usuário logado x conta que executa
+    # Em PC de empresa o técnico digita a senha de admin dele: o app roda como o técnico, mas os ajustes "de usuário"
+    # (HKCU) têm que ir para quem está logado na tela. Resolve-UserPath troca HKCU:\ pelo registro dessa pessoa.
+    function Get-SessionUser {
+        $console = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).UserName   # DOMINIO\usuario na tela
+        foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue)) {
+            $o = Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction SilentlyContinue
+            if (-not $o -or -not $o.User) { continue }
+            $full = "$($o.Domain)\$($o.User)"
+            if ($console -and $full -ne $console) { continue }
+            $sid = (Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid
+            if ($sid) { return [pscustomobject]@{ Name = $full; Sid = $sid } }
+        }
+        $null
+    }
+    $Global:RunAs       = "$env:USERDOMAIN\$env:USERNAME"
+    $Global:SessionUser = Get-SessionUser
+    $Global:UserHive    = $null
+    if ($Global:SessionUser -and $Global:SessionUser.Sid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value -and
+        (Test-Path "Registry::HKEY_USERS\$($Global:SessionUser.Sid)")) {
+        $Global:UserHive = $Global:SessionUser.Sid
+    }
+    $Global:TargetUser    = if ($Global:SessionUser) { $Global:SessionUser.Name } else { $Global:RunAs }
+    $Global:TargetProfile = if ($Global:UserHive) { (Get-CimInstance Win32_UserProfile -Filter "SID='$($Global:UserHive)'" -ErrorAction SilentlyContinue).LocalPath } else { $env:USERPROFILE }
+    if (-not $Global:TargetProfile) { $Global:TargetProfile = $env:USERPROFILE }
+
+    function Resolve-UserPath([string]$Path) {
+        if (-not $Global:UserHive -or $Path -notmatch '^HKCU:\\') { return $Path }
+        $rest = $Path.Substring(6)
+        # HKCU\Software\Classes fica num arquivo separado do perfil (SID_Classes)
+        if ($rest -match '^Software\\Classes(\\|$)') { return "Registry::HKEY_USERS\$($Global:UserHive)_Classes$($rest.Substring(16))" }
+        "Registry::HKEY_USERS\$($Global:UserHive)\$rest"
+    }
 
     function Write-TLog {
         param([string]$Message, [string]$Level = 'INFO')
@@ -33,10 +68,12 @@ $TaskLibrary = {
 
     function Set-Reg {
         param([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord')
+        $Path = Resolve-UserPath $Path
         if ($null -ne $Global:UndoItems -and -not $Global:UndoSeen.ContainsKey("$Path|$Name")) {
             $vn = if ($Name -eq '(default)') { '' } else { $Name }
             $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
-            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false }
+            # KX: a chave já existia? Se foi o TurboPC que criou, o desfazer apaga a chave inteira
+            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key }
             if ($key -and ($key.GetValueNames() -contains $vn)) {
                 $rec.E = $true
                 $rec.K = "$($key.GetValueKind($vn))"
@@ -149,7 +186,7 @@ $TaskLibrary = {
     # Executáveis de jogos instalados pela Steam e pela Epic
     function Get-GameExes {
         $dirs = @()
-        $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+        $steam = (Get-ItemProperty (Resolve-UserPath 'HKCU:\Software\Valve\Steam') -ErrorAction SilentlyContinue).SteamPath
         if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
         if ($steam -and (Test-Path "$steam\steamapps\libraryfolders.vdf")) {
             $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' })

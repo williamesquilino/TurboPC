@@ -153,7 +153,7 @@
             Name='Jogos sempre na placa de vídeo dedicada'
             Desc='Marca os jogos da Steam e da Epic como "Alto desempenho" nas configurações de gráficos do Windows (em notebook, impede o jogo de rodar no vídeo integrado) e liga as otimizações para jogos em janela do Windows 11.'
             Action={
-                $k = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+                $k = Resolve-UserPath 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
                 $cur = [string](Get-ItemProperty $k -Name DirectXUserGlobalSettings -ErrorAction SilentlyContinue).DirectXUserGlobalSettings
                 $opts = [ordered]@{}
                 foreach ($kv in ($cur -split ';' | Where-Object { $_ -match '=' })) { $a = $kv -split '=', 2; $opts[$a[0]] = $a[1] }

@@ -28,7 +28,7 @@ function ConvertFrom-Rot13([string]$s) {
 # Nomes dos jogos instalados (Steam, Epic, Riot e lista de programas instalados)
 function Get-InstalledGames {
     $names = @()
-    $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+    $steam = (Get-ItemProperty (Resolve-UserPath 'HKCU:\Software\Valve\Steam') -ErrorAction SilentlyContinue).SteamPath
     if (-not $steam) { $steam = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' -ErrorAction SilentlyContinue).InstallPath }
     if ($steam -and (Test-Path "$steam\steamapps")) {
         $libs = @($steam) + @(Select-String -Path "$steam\steamapps\libraryfolders.vdf" -Pattern '"path"\s+"(.+)"' -ErrorAction SilentlyContinue |
@@ -65,7 +65,8 @@ function Get-AppUsage {
     $work = 'winword|excel|powerpnt|outlook|onenote|teams|acrord32|acrobat|zoom|slack|mstsc|sapgui|anydesk|libreoffice|soffice'
     $game = 'steam|riotclient|valorant|leagueclient|epicgames|battle\.net|eadesktop|upc\.exe|ubisoft|discord|obs64|cs2|fortnite|gog'
     $r = [pscustomobject]@{ Work = 0; Game = 0; WorkApps = @(); GameApps = @() }
-    $key = Get-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count' -ErrorAction SilentlyContinue
+    # o contador de quem está logado na tela (não o do técnico que digitou a senha de admin)
+    $key = Get-Item (Resolve-UserPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count') -ErrorAction SilentlyContinue
     if (-not $key) { return $r }
     foreach ($n in $key.GetValueNames()) {
         $d = $key.GetValue($n)

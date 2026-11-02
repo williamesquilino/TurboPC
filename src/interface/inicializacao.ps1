@@ -2,8 +2,11 @@
 # ---------------------------------------------------------------- inicialização (startup)
 function Get-StartupEntries {
     $base = 'Software\Microsoft\Windows\CurrentVersion'
+    # "do usuário" é de quem está logado na tela, mesmo se o app roda com a senha de admin do técnico
+    $userLabel = "Usuário $(($Global:TargetUser -split '\\')[-1])"
+    $userStartup = if ($Global:UserHive) { "$($Global:TargetProfile)\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" } else { [Environment]::GetFolderPath('Startup') }
     $sources = @(
-        @{ Run="HKCU:\$base\Run";                               Approved="HKCU:\$base\Explorer\StartupApproved\Run";   Scope='Usuário atual' },
+        @{ Run=(Resolve-UserPath "HKCU:\$base\Run"); Approved=(Resolve-UserPath "HKCU:\$base\Explorer\StartupApproved\Run"); Scope=$userLabel },
         @{ Run="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run";             Approved="HKLM:\$base\Explorer\StartupApproved\Run";   Scope='Todos os usuários' },
         @{ Run="HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run"; Approved="HKLM:\$base\Explorer\StartupApproved\Run32"; Scope='Todos os usuários' }
     )
@@ -17,7 +20,7 @@ function Get-StartupEntries {
         }
     }
     $folders = @(
-        @{ Path=[Environment]::GetFolderPath('Startup');       Approved="HKCU:\$base\Explorer\StartupApproved\StartupFolder"; Scope='Usuário atual' },
+        @{ Path=$userStartup; Approved=(Resolve-UserPath "HKCU:\$base\Explorer\StartupApproved\StartupFolder"); Scope=$userLabel },
         @{ Path=[Environment]::GetFolderPath('CommonStartup'); Approved="HKLM:\$base\Explorer\StartupApproved\StartupFolder"; Scope='Todos os usuários' }
     )
     foreach ($f in $folders) {

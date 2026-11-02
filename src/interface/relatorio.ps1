@@ -32,9 +32,23 @@ pre{background:#0e1117;color:#c9d1e0;padding:16px;border-radius:12px;white-space
 <h2>O que foi feito nesta sessão</h2><pre>$(& $h $(if ($ui.LogBox.Text) { $ui.LogBox.Text } else { 'Nenhuma otimização executada ainda.' }))</pre>
 </div></body></html>
 "@
-    $file = Join-Path ([Environment]::GetFolderPath('Desktop')) ('Relatorio_TurboPC_{0}_{1}.html' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd_HH-mm'))
-    [IO.File]::WriteAllText($file, $html, (New-Object Text.UTF8Encoding $true))
-    Write-TLog "Relatório salvo em $file" 'OK'
+    $name = 'Relatorio_TurboPC_{0}_{1}.html' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd_HH-mm')
+    # uma cópia fica sempre no PC, num lugar fixo para o técnico achar depois
+    $keep = Join-Path $env:ProgramData 'TurboPC\relatorios'
+    New-Item -ItemType Directory -Path $keep -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $keep $name), $html, (New-Object Text.UTF8Encoding $true))
+    $file = Join-Path (Get-UserDesktop) $name
+    try { [IO.File]::WriteAllText($file, $html, (New-Object Text.UTF8Encoding $true)) } catch { $file = Join-Path $keep $name }
+    Write-TLog "Relatório salvo em $file (cópia em $keep)" 'OK'
     Start-Process $file
+}
+
+# Área de Trabalho de quem está logado (pode estar no OneDrive); sem outro usuário, a da conta atual
+function Get-UserDesktop {
+    if (-not $Global:UserHive) { return [Environment]::GetFolderPath('Desktop') }
+    $key = Get-Item (Resolve-UserPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders') -ErrorAction SilentlyContinue
+    $raw = if ($key) { [string]$key.GetValue('Desktop', $null, 'DoNotExpandEnvironmentNames') }
+    $path = if ($raw) { $raw -replace '%USERPROFILE%', $Global:TargetProfile } else { "$($Global:TargetProfile)\Desktop" }
+    if (Test-Path -LiteralPath $path) { $path } else { "$($Global:TargetProfile)\Desktop" }
 }
 

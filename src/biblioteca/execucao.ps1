@@ -10,7 +10,9 @@
         $Global:UndoItems = New-Object Collections.ArrayList
         $Global:UndoNotes = New-Object Collections.ArrayList
         $Global:UndoSeen  = @{}
-        Write-TLog "==== $Label | $env:COMPUTERNAME | $($sel.Count) tarefa(s) | usuário $env:USERNAME ====" 'STEP'
+        Write-TLog "==== $Label | $env:COMPUTERNAME | $($sel.Count) tarefa(s) | executado por $Global:RunAs ====" 'STEP'
+        if ($Global:UserHive) { Write-TLog "  ajustes de usuário vão para quem está logado: $Global:TargetUser" }
+        elseif (-not $Global:SessionUser) { Write-TLog '  ninguém logado na tela: ajustes de usuário vão para a conta que executou' 'WARN' }
 
         if ($RestorePoint) {
             if ($OnProgress) { & $OnProgress 0 'Criando ponto de restauração...' }
@@ -35,7 +37,7 @@
                 New-Item -ItemType Directory -Path $Global:UndoDir -Force | Out-Null
                 $file = Join-Path $Global:UndoDir ('{0}.json' -f (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'))
                 [ordered]@{
-                    Date = (Get-Date).ToString('s'); Label = $Label; User = "$env:USERDOMAIN\$env:USERNAME"; Version = 1
+                    Date = (Get-Date).ToString('s'); Label = $Label; User = $Global:RunAs; Target = $Global:TargetUser; Version = 1
                     Tasks = @($sel | ForEach-Object Name); Items = @($Global:UndoItems); Notes = @($Global:UndoNotes); Undone = $null
                 } | ConvertTo-Json -Depth 6 | Set-Content -Path $file -Encoding UTF8
                 Write-TLog "  $($Global:UndoItems.Count) alteração(ões) guardada(s): dá para desfazer em Histórico" 'OK'
@@ -58,6 +60,9 @@
         $rec = Get-Content $File -Raw -Encoding UTF8 | ConvertFrom-Json
         $items = @($rec.Items)
         [array]::Reverse($items)
+        # ajustes de usuário de outra pessoa só voltam com ela logada (o registro dela precisa estar carregado)
+        $away = @($items | Where-Object { $_.T -eq 'reg' -and $_.P -match '^Registry::HKEY_USERS\\(S-[\d-]+)' -and -not (Test-Path "Registry::HKEY_USERS\$($Matches[1])") })
+        if ($away) { Write-TLog "  $($away.Count) ajuste(s) de usuário são de $($rec.Target), que não está logado agora: entre com esse usuário e desfaça de novo para voltar esses também" 'WARN' }
         Write-TLog "==== Desfazendo: $($rec.Label) de $(([datetime]$rec.Date).ToString('dd/MM/yyyy HH:mm')) ($($items.Count) alterações) ====" 'STEP'
         $ok = 0; $fail = 0; $i = 0
         foreach ($it in $items) {
@@ -77,7 +82,18 @@
                             if (-not (Test-Path -LiteralPath $it.P)) { New-Item -Path $it.P -Force | Out-Null }
                             New-ItemProperty -LiteralPath $it.P -Name $it.N -Value $val -PropertyType $it.K -Force -ErrorAction Stop | Out-Null
                         } elseif (Test-Path -LiteralPath $it.P) {
-                            Remove-ItemProperty -LiteralPath $it.P -Name $it.N -ErrorAction SilentlyContinue
+                            $k = Get-Item -LiteralPath $it.P
+                            if ($it.PSObject.Properties.Name -contains 'KX' -and -not $it.KX -and $k.SubKeyCount -eq 0 -and $k.ValueCount -le 1) {
+                                # chave criada pelo TurboPC e sem mais nada dentro: sai inteira (ex.: menu de clique direito clássico)
+                                Remove-Item -LiteralPath $it.P -Force -ErrorAction Stop
+                            } else {
+                                # pelo .NET porque o Remove-ItemProperty não apaga o valor "(padrão)" de uma chave
+                                $hives = @{ HKEY_LOCAL_MACHINE = [Microsoft.Win32.Registry]::LocalMachine; HKEY_USERS = [Microsoft.Win32.Registry]::Users; HKEY_CURRENT_USER = [Microsoft.Win32.Registry]::CurrentUser }
+                                $full = $k.Name   # ex.: HKEY_USERS\S-1-5-...\Software\...
+                                $root, $sub = $full -split '\\', 2
+                                $w = $hives[$root].OpenSubKey($sub, $true)
+                                if ($w) { $w.DeleteValue($(if ($it.N -eq '(default)') { '' } else { $it.N }), $false); $w.Close() }
+                            }
                         }
                     }
                     'svc' {

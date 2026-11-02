@@ -49,6 +49,16 @@
         }
     }
 
+    # PC no domínio: política de navegador e atualizações entre PCs costumam ser da TI da empresa (GPO, WSUS, cache de rede)
+    if ($Global:IsDomain) {
+        $DomainIds = 'browserbg', 'deliveryp2p'
+        foreach ($name in @($Global:Modes.Keys)) {
+            $m = $Global:Modes[$name]
+            $m.Extras = @($m.Extras) + @($m.Ids | Where-Object { $DomainIds -contains $_ }) | Select-Object -Unique
+            $m.Ids    = @($m.Ids | Where-Object { $DomainIds -notcontains $_ })
+        }
+    }
+
     # na ordem das abas, sem repetidos e sem o que não existe
     function Get-ProfileIds([string]$Name) {
         $ids = $Global:Modes[$Name].Ids
