@@ -25,7 +25,7 @@ function Complete-Run {
     }
     if ($sync.Mode -eq 'undo') {
         Load-History
-        Update-Info
+        Start-InfoLoad
         $r = Show-Msg "Pronto, as alterações foram desfeitas. Veja os detalhes no Histórico.`n`nReiniciar agora para valer tudo?" 'YesNo' 'Information'
         if ($r -eq 'Yes') { shutdown.exe /r /t 5 /c "Reiniciando após desfazer (TurboPC)" }
         return
@@ -40,7 +40,7 @@ function Complete-Run {
     $script:SpaceStale = $true
     $script:SessionFreed += [int64]$sync.Freed
     $ui.TxtFreed.Text = "Espaço liberado nesta sessão: $(Format-Size $script:SessionFreed)"
-    Update-Info
+    Start-InfoLoad
     $r = Show-Msg "Otimização concluída!`n`nEspaço liberado: $(Format-Size $sync.Freed)`n`nSe algo ficar diferente do que você queria, dá para desfazer no Histórico.`n`nAlgumas mudanças só valem depois de reiniciar. Reiniciar agora?" 'YesNo' 'Information'
     if ($r -eq 'Yes') { shutdown.exe /r /t 5 /c "Reiniciando após otimização (TurboPC)" }
 }
@@ -58,6 +58,7 @@ $timer.Add_Tick({
         if ($sync.Done) { Complete-Run }
     }
     if ($sync.UpdateBusy -and $sync.UpdateDone) { Complete-UpdateCheck }
+    if ($sync.InfoBusy -and $sync.InfoDone) { Complete-InfoLoad }
     if ($sync.FpsBusy) {
         $ui.FpsInfo.Text = $sync.FpsStatus; $ui.StatusText.Text = $sync.FpsStatus
         if ($sync.FpsDone) { Complete-FpsTest }

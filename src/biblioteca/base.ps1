@@ -73,7 +73,8 @@ $TaskLibrary = {
             $vn = if ($Name -eq '(default)') { '' } else { $Name }
             $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
             # KX: a chave já existia? Se foi o TurboPC que criou, o desfazer apaga a chave inteira
-            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key }
+            # S: o valor que o TurboPC gravou (o desfazer de política confere se ainda é ele)
+            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key; S = $Value }
             if ($key -and ($key.GetValueNames() -contains $vn)) {
                 $rec.E = $true
                 $rec.K = "$($key.GetValueKind($vn))"

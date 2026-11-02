@@ -25,7 +25,7 @@ param(
 
 $AppName    = 'TurboPC'
 $AppAuthor  = 'William Silva Esquilino'
-$AppVersion = '1.9.0'
+$AppVersion = '1.10.0'
 
 # Quando compilado com ps2exe: um .exe com "Auto" no nome roda direto um modo (o nome do arquivo diz qual).
 $ExePath    = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -133,7 +133,8 @@ $TaskLibrary = {
             $vn = if ($Name -eq '(default)') { '' } else { $Name }
             $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
             # KX: a chave já existia? Se foi o TurboPC que criou, o desfazer apaga a chave inteira
-            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key }
+            # S: o valor que o TurboPC gravou (o desfazer de política confere se ainda é ele)
+            $rec = [ordered]@{ T = 'reg'; P = $Path; N = $Name; E = $false; KX = [bool]$key; S = $Value }
             if ($key -and ($key.GetValueNames() -contains $vn)) {
                 $rec.E = $true
                 $rec.K = "$($key.GetValueKind($vn))"
@@ -567,10 +568,16 @@ $TaskLibrary = {
             Name='Navegadores não ficam abertos escondidos'
             Desc='Impede o Edge e o Chrome de continuarem rodando depois de fechados e de abrirem junto com o Windows (Inicialização Turbo). Economiza bastante RAM.'
             Action={
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' 'StartupBoostEnabled' 0
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' 'BackgroundModeEnabled' 0
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Google\Chrome' 'BackgroundModeEnabled' 0
-                Write-TLog '  Edge e Chrome sem segundo plano' 'OK'
+                # navegador que já tem política da empresa (bloqueio de sites, extensões...) fica como está: quem manda nele é a GPO
+                $mine = 'StartupBoostEnabled', 'BackgroundModeEnabled'
+                foreach ($br in @(@{ N = 'Edge'; P = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'; V = $mine },
+                                  @{ N = 'Chrome'; P = 'HKLM:\SOFTWARE\Policies\Google\Chrome'; V = @('BackgroundModeEnabled') })) {
+                    $k = Get-Item -LiteralPath $br.P -ErrorAction SilentlyContinue
+                    $other = @(if ($k) { @($k.GetValueNames() | Where-Object { $mine -notcontains $_ }) + @($k.GetSubKeyNames()) })
+                    if ($other.Count) { Write-TLog "  $($br.N) já tem políticas da empresa: não foi alterado" 'WARN'; continue }
+                    foreach ($v in $br.V) { Set-Reg $br.P $v 0 }
+                    Write-TLog "  $($br.N) sem segundo plano" 'OK'
+                }
             } }
 
         # ======================= PRIVACIDADE =======================
@@ -1128,6 +1135,14 @@ $TaskLibrary = {
             $i++
             if ($OnProgress) { & $OnProgress ([int](100 * $i / [math]::Max(1, $items.Count))) "Desfazendo $i de $($items.Count)" }
             try {
+                # política (GPO) que mudou depois do TurboPC: a empresa mexeu nela, então fica como a empresa deixou
+                if ($it.T -eq 'reg' -and $it.P -match '\\Policies\\' -and $it.PSObject.Properties.Name -contains 'S') {
+                    $cur = (Get-ItemProperty -LiteralPath $it.P -Name $it.N -ErrorAction SilentlyContinue).($it.N)
+                    if ($null -eq $cur -or (@($cur) -join ',') -ne (@($it.S) -join ',')) {
+                        Write-TLog "  $($it.N) em $($it.P -replace '^Registry::', '') foi mudado depois (provavelmente pela GPO): mantido como está"
+                        $ok++; continue
+                    }
+                }
                 switch ($it.T) {
                     'reg' {
                         if ($it.E) {
@@ -1480,7 +1495,7 @@ $Xaml = @'
                   <StackPanel DockPanel.Dock="Bottom" Margin="28,0,16,18">
                     <TextBlock Text="Criado por" FontSize="10.5" Foreground="#555C6E"/>
                     <TextBlock Text="William Silva Esquilino" FontSize="12" FontWeight="SemiBold" Foreground="#9AA1B4" TextWrapping="Wrap" Margin="0,1,0,6"/>
-                    <TextBlock x:Name="VersionText" Text="v1.7.0" FontSize="11" Foreground="#555C6E"/>
+                    <TextBlock x:Name="VersionText" Text="v__VERSAO__" FontSize="11" Foreground="#555C6E"/>
                     <Button x:Name="BtnUpdate" Style="{StaticResource BtnGhost}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,5" FontSize="11.5">
                       <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" Margin="0,2,6,0"/><TextBlock x:Name="TxtUpdate" Text="Procurar atualização"/></StackPanel>
                     </Button>
@@ -2105,6 +2120,8 @@ $TaskIcons = @{
 $AppIcons = @{ 'Navegadores'='E774'; 'Escritório'='E8A5'; 'Comunicação'='E8BD'; 'Acesso remoto'='E7F4'; 'Utilitários'='E713'; 'Mídia'='E714'
                'Jogos'='E7FC'; 'Componentes'='E8F1'; 'Diagnóstico'='E9D9'; 'Desenvolvimento'='E943' }
 
+# a versão vai direto no XAML: aparece certa desde o primeiro instante
+$Xaml = $Xaml.Replace('__VERSAO__', $AppVersion)
 $window = [Windows.Markup.XamlReader]::Parse($Xaml)
 $ui = @{}
 foreach ($m in [regex]::Matches($Xaml, 'x:Name="(\w+)"')) {
@@ -2412,8 +2429,9 @@ function Show-UsageQuestion {
 }
 
 # Lê preferências, detecta o uso e, se ainda não perguntou, pergunta
-function Initialize-Usage([switch]$Ask) {
-    $script:UsageGuess = Get-UsageGuess
+# $Guess vem pronto da leitura em segundo plano; se não vier, calcula aqui
+function Initialize-Usage([switch]$Ask, $Guess) {
+    if ($Guess) { $script:UsageGuess = $Guess } elseif (-not $script:UsageGuess) { $script:UsageGuess = Get-UsageGuess }
     $prefs = Get-Prefs
     $script:SavedAnswers = Get-SavedAnswers $prefs
     $script:UsageKind = if ($prefs -and $prefs.Kind -and $UsageKinds.Contains([string]$prefs.Kind)) { [string]$prefs.Kind } else { $null }
@@ -2730,10 +2748,10 @@ function Invoke-Mode([string]$Key) {
 Build-ModeCards
 
 # Faixa "Este PC" acima dos modos: tipo de PC, plano de energia e tomada/bateria. Devolve um aviso para o diagnóstico, se houver.
-function Update-PcBanner([string]$Hardware) {
-    $plan = (Get-CimInstance -Namespace root\cimv2\power -ClassName Win32_PowerPlan -Filter 'IsActive=True' -ErrorAction SilentlyContinue | Select-Object -First 1).ElementName
+function Update-PcBanner([string]$Hardware, $D) {
+    $plan = $D.Plan
     if (-not $plan) {
-        $out = "$(powercfg /getactivescheme 2>$null)"
+        $out = [string]$D.PlanOut
         $known = @{ '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Equilibrado'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'Alto desempenho'
                     'a1841308-3541-4fab-bc81-f71556f20b4a' = 'Economia de energia'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Desempenho Máximo' }
         $guid = [regex]::Match($out, '[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}').Value.ToLower()
@@ -2741,7 +2759,7 @@ function Update-PcBanner([string]$Hardware) {
     }
     $fast = $plan -match 'Alto|High|M.ximo|Ultimate|Desempenho'
     $saver = $plan -match 'Economia|saver'
-    $bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+    $bat = $D.Bat
     $warn = $null
     if ($Global:IsLaptop -and $bat) {
         $onAC = $bat.BatteryStatus -ne 1
@@ -2869,16 +2887,97 @@ function Set-Score {
     $ui.ScoreRing.StrokeDashArray = New-Object Windows.Media.DoubleCollection (,[double[]]@((([math]::PI * 121 / 11) * $score / 100), 1000))
 }
 
-function Update-Info {
+# Lê tudo o que o Painel mostra, sem tocar na tela: roda em segundo plano (Start-InfoLoad) para a janela não travar
+function Get-PcData {
+    $d = @{}
+    $d.Os  = Get-CimInstance Win32_OperatingSystem
+    $d.Cs  = Get-CimInstance Win32_ComputerSystem
+    $d.Cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+    $d.Cv  = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+    $d.Disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
+    try {
+        $dn = (Get-Partition -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction Stop).DiskNumber
+        $d.AllPd = @(Get-PhysicalDisk -ErrorAction Stop)
+        $d.Pd  = $d.AllPd | Where-Object { $_.DeviceId -eq "$dn" } | Select-Object -First 1
+        $d.Rel = $d.Pd | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
+    } catch {}
+    $d.Gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'Remote|Virtual|Parsec|Mirage|DisplayLink|Meta ' })
+    $d.Res  = @(Get-CimInstance CIM_VideoControllerResolution -ErrorAction SilentlyContinue)
+    $d.Mp   = try { Get-MpComputerStatus -ErrorAction Stop } catch { $null }
+    $d.RebootPending = (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or
+                       (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')
+    $d.Bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($Global:IsLaptop) {
+        try {
+            $d.BatFull   = (Get-CimInstance -Namespace root\wmi -ClassName BatteryFullChargedCapacity -ErrorAction Stop | Select-Object -First 1).FullChargedCapacity
+            $d.BatDesign = (Get-CimInstance -Namespace root\wmi -ClassName BatteryStaticData -ErrorAction Stop | Select-Object -First 1).DesignedCapacity
+        } catch {}
+    }
+    $d.Plan = (Get-CimInstance -Namespace root\cimv2\power -ClassName Win32_PowerPlan -Filter 'IsActive=True' -ErrorAction SilentlyContinue | Select-Object -First 1).ElementName
+    if (-not $d.Plan) { $d.PlanOut = "$(powercfg /getactivescheme 2>$null)" }
+    $d
+}
+
+# Leitura em segundo plano: dados do Painel e detecção de uso. O temporizador chama Complete-InfoLoad quando termina.
+$infoWorker = {
+    param($sync, $LibText, $FnText, $Competitive, $NotGamesRx)
+    try {
+        $CompetitiveGames = $Competitive; $NotGames = $NotGamesRx
+        . ([scriptblock]::Create($LibText))
+        . ([scriptblock]::Create($FnText))
+        $sync.InfoData = Get-PcData
+        $sync.UsageData = Get-UsageGuess
+    } catch {
+        $sync.InfoError = $_.Exception.Message
+    } finally {
+        $sync.InfoDone = $true
+    }
+}
+
+function Start-InfoLoad {
+    if ($sync.InfoBusy) { return }
+    $sync.InfoBusy = $true; $sync.InfoDone = $false; $sync.InfoError = $null
+    if (-not $script:InfoLoadedOnce) {
+        $ui.TxtHost.Text = 'Lendo as informações do computador...'
+        $ui.PanelDiag.Children.Clear()
+        $tb = New-Object Windows.Controls.TextBlock
+        $tb.Text = 'Lendo as informações do computador...'; $tb.Foreground = '#8A91A3'; $tb.FontSize = 13
+        [void]$ui.PanelDiag.Children.Add($tb)
+    }
+    $fns = 'Get-PcData', 'Get-InstalledNames', 'ConvertFrom-Rot13', 'Get-FriendlyApp', 'Get-InstalledGames', 'Get-AppUsage', 'Get-UsageGuess' |
+           ForEach-Object { (Get-Item "function:$_").ScriptBlock.Ast.Extent.Text }
+    $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
+    $ps = [powershell]::Create(); $ps.Runspace = $rs
+    [void]$ps.AddScript($infoWorker.ToString()).AddArgument($sync).AddArgument($TaskLibrary.ToString()).AddArgument($fns -join "`r`n").AddArgument($CompetitiveGames).AddArgument($NotGames)
+    $script:infoJob = @{ PS = $ps; H = $ps.BeginInvoke() }
+}
+
+function Complete-InfoLoad {
+    $sync.InfoBusy = $false
+    try { [void]$script:infoJob.PS.EndInvoke($script:infoJob.H); $script:infoJob.PS.Runspace.Dispose(); $script:infoJob.PS.Dispose() } catch {}
+    Update-Info $sync.InfoData
+    if (-not $script:InfoLoadedOnce) {
+        $script:InfoLoadedOnce = $true
+        # primeira vez: com os dados de uso prontos, indica o modo (e pergunta, se ainda não perguntou)
+        Initialize-Usage -Guess $sync.UsageData
+        $ui.StatusText.Text = 'Pronto. Escolha um modo no Painel.'
+    }
+}
+
+# Desenha o Painel com os dados já lidos (rápido: nada de consulta ao Windows aqui)
+function Update-Info($D) {
+    if (-not $D) {
+        $ui.PanelDiag.Children.Clear()
+        Add-Diag "Não foi possível ler as informações do computador. $($sync.InfoError)" '#F5A524'
+        Set-Score
+        return
+    }
     $ui.PanelDiag.Children.Clear()
     $script:Penalty = 0
     $red = '#F87171'; $yellow = '#F5A524'; $green = '#4ADE80'; $blue = '#60A5FA'
     $issues = 0
     try {
-        $os  = Get-CimInstance Win32_OperatingSystem
-        $cs  = Get-CimInstance Win32_ComputerSystem
-        $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-        $cv  = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+        $os = $D.Os; $cs = $D.Cs; $cpu = $D.Cpu; $cv = $D.Cv
 
         $who = if ($Global:UserHive) { "aplicado por $($Global:RunAs) no usuário $($Global:TargetUser)" } else { "executando como $($Global:RunAs)" }
         $ui.TxtHost.Text = "$($cs.Manufacturer) $($cs.Model)  •  $env:COMPUTERNAME  •  $who"
@@ -2897,7 +2996,7 @@ function Update-Info {
         $ui.InfoRAMSub.Text = "$ramPct% em uso  •  $(Format-Size $ramFree) livres"
         $ui.BarRAM.Value = $ramPct
 
-        $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
+        $disk = $D.Disk
         $freePct = [int](100 * $disk.FreeSpace / $disk.Size)
         $ui.InfoDisk.Text = "$(Format-Size $disk.FreeSpace) livres"
         $ui.InfoDiskSub.Text = "de $(Format-Size $disk.Size)  •  $freePct% livre"
@@ -2905,13 +3004,12 @@ function Update-Info {
 
         $media = 'Não identificado'; $model = ''; $wear = $null; $sick = @()
         try {
-            $dn = (Get-Partition -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction Stop).DiskNumber
-            $allPd = @(Get-PhysicalDisk -ErrorAction Stop)
-            $pd = $allPd | Where-Object { $_.DeviceId -eq "$dn" } | Select-Object -First 1
+            $allPd = @($D.AllPd); $pd = $D.Pd
+            if (-not $pd) { throw 'sem disco' }
             $model = $pd.FriendlyName
             $media = switch ("$($pd.MediaType)") { 'SSD' { if ("$($pd.BusType)" -eq 'NVMe') { 'SSD NVMe' } else { 'SSD' } } 'HDD' { 'HD mecânico' } default { 'Não identificado' } }
             $sick = @($allPd | Where-Object { $_.HealthStatus -and "$($_.HealthStatus)" -ne 'Healthy' })
-            $rel = $pd | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
+            $rel = $D.Rel
             $parts = @($model)
             if ("$($pd.HealthStatus)" -eq 'Healthy') { $parts += 'saúde boa' }
             if ($null -ne $rel.Wear -and $media -like 'SSD*') { $wear = [int]$rel.Wear; $parts += "desgaste $wear%" }
@@ -2926,8 +3024,7 @@ function Update-Info {
         $ui.InfoUptimeSub.Text = "desde $($os.LastBootUpTime.ToString('dd/MM/yyyy HH:mm'))"
 
         # vídeo: prefere a placa dedicada quando há mais de uma
-        $gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -notmatch 'Remote|Virtual|Parsec|Mirage|DisplayLink|Meta ' })
+        $gpus = @($D.Gpus)
         $gpu = $gpus | Sort-Object { if ($_.Name -match 'NVIDIA|Radeon|Arc') { 0 } else { 1 } } | Select-Object -First 1
         $script:DriverUrl = $null
         $drvAge = 0
@@ -2954,7 +3051,7 @@ function Update-Info {
         $active = $gpus | Where-Object CurrentRefreshRate | Select-Object -First 1
         if ($active) {
             $w = $active.CurrentHorizontalResolution; $h = $active.CurrentVerticalResolution
-            $maxHz = (Get-CimInstance CIM_VideoControllerResolution -ErrorAction SilentlyContinue |
+            $maxHz = ($D.Res |
                       Where-Object { $_.HorizontalResolution -eq $w -and $_.VerticalResolution -eq $h } |
                       Measure-Object RefreshRate -Maximum).Maximum
             $maxHz = [math]::Max([int]$maxHz, [int]$active.CurrentRefreshRate)
@@ -2971,20 +3068,19 @@ function Update-Info {
         if ($wear -ge 80) { Add-Diag "O SSD já gastou $wear% da vida útil. Planeje a troca." $yellow; $issues++ }
         if ([int]$os.BuildNumber -lt 22000) { Add-Diag 'Windows 10: o suporte gratuito acabou em outubro de 2025. Sem o programa ESU, o PC não recebe mais correções de segurança. Se o hardware for compatível, migre para o Windows 11.' $yellow; $issues++ }
         try {
-            $mp = Get-MpComputerStatus -ErrorAction Stop
+            $mp = $D.Mp
+            if (-not $mp) { throw 'sem antivírus' }
             if (-not $mp.AMRunningMode -or $mp.AMRunningMode -eq 'Normal') {
                 if (-not $mp.RealTimeProtectionEnabled) { Add-Diag 'A proteção em tempo real do Microsoft Defender está DESLIGADA. Ligue em Segurança do Windows > Proteção contra vírus e ameaças.' $red; $issues++ }
                 elseif ($mp.AntivirusSignatureAge -gt 7) { Add-Diag "O antivírus está com as definições de $($mp.AntivirusSignatureAge) dias atrás. Rode o Windows Update." $yellow; $issues++ }
             }
         } catch {}
-        if ((Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') -or
-            (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending')) {
+        if ($D.RebootPending) {
             Add-Diag 'Há atualizações do Windows esperando o PC reiniciar para terminar de instalar.' $yellow; $issues++
         }
         if ($Global:IsLaptop) {
             try {
-                $full   = (Get-CimInstance -Namespace root\wmi -ClassName BatteryFullChargedCapacity -ErrorAction Stop | Select-Object -First 1).FullChargedCapacity
-                $design = (Get-CimInstance -Namespace root\wmi -ClassName BatteryStaticData -ErrorAction Stop | Select-Object -First 1).DesignedCapacity
+                $full = $D.BatFull; $design = $D.BatDesign
                 if ($full -and $design) {
                     $bh = [math]::Min(100, [int](100 * $full / $design))
                     if ($bh -lt 60) { Add-Diag "A bateria segura só $bh% da carga original. Está na hora de trocar." $yellow; $issues++ }
@@ -3002,7 +3098,7 @@ function Update-Info {
         elseif ($freePct -lt 20) { Add-Diag "$freePct% livre no $env:SystemDrive. Rode a Limpeza para ganhar espaço." $yellow; $issues++ }
         if ($up.TotalDays -ge 7) { Add-Diag "PC ligado há $($up.Days) dias sem reiniciar. Reiniciar de vez em quando libera memória e conclui atualizações." $yellow; $issues++ }
         $hw = @($media, "$ramGB GB de RAM", $(if ($gpu) { ($gpu.Name -replace '\(R\)|\(TM\)|NVIDIA |AMD |GeForce ', '').Trim() })) | Where-Object { $_ -and $_ -ne 'Não identificado' }
-        $powerWarn = Update-PcBanner ($hw -join '  ·  ')
+        $powerWarn = Update-PcBanner ($hw -join '  ·  ') $D
         if ($powerWarn) { Add-Diag $powerWarn $yellow; $issues++ }
 
         $enabledStartup = @($script:StartupBoxes | Where-Object { $_.IsChecked }).Count
@@ -3015,7 +3111,7 @@ function Update-Info {
             Add-Diag "Ninguém está logado na tela (acesso remoto?): os ajustes de usuário vão para a conta '$($Global:RunAs)'." $yellow
         }
         if ($Global:IsDomain) {
-            $dom = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Domain
+            $dom = $cs.Domain
             Add-Diag "PC no domínio '$dom'. As políticas da empresa (GPO) mandam no que configuram: se alguma delas mexer na mesma coisa, a da empresa vale. Por isso os ajustes de navegador e de atualizações entre PCs ficam fora dos modos aqui." $blue
         }
         if ($issues -eq 0) { Add-Diag 'Nada crítico encontrado. Use o modo Recomendado de vez em quando para manter tudo em dia.' $green }
@@ -4827,7 +4923,7 @@ function Complete-Run {
     }
     if ($sync.Mode -eq 'undo') {
         Load-History
-        Update-Info
+        Start-InfoLoad
         $r = Show-Msg "Pronto, as alterações foram desfeitas. Veja os detalhes no Histórico.`n`nReiniciar agora para valer tudo?" 'YesNo' 'Information'
         if ($r -eq 'Yes') { shutdown.exe /r /t 5 /c "Reiniciando após desfazer (TurboPC)" }
         return
@@ -4842,7 +4938,7 @@ function Complete-Run {
     $script:SpaceStale = $true
     $script:SessionFreed += [int64]$sync.Freed
     $ui.TxtFreed.Text = "Espaço liberado nesta sessão: $(Format-Size $script:SessionFreed)"
-    Update-Info
+    Start-InfoLoad
     $r = Show-Msg "Otimização concluída!`n`nEspaço liberado: $(Format-Size $sync.Freed)`n`nSe algo ficar diferente do que você queria, dá para desfazer no Histórico.`n`nAlgumas mudanças só valem depois de reiniciar. Reiniciar agora?" 'YesNo' 'Information'
     if ($r -eq 'Yes') { shutdown.exe /r /t 5 /c "Reiniciando após otimização (TurboPC)" }
 }
@@ -4860,6 +4956,7 @@ $timer.Add_Tick({
         if ($sync.Done) { Complete-Run }
     }
     if ($sync.UpdateBusy -and $sync.UpdateDone) { Complete-UpdateCheck }
+    if ($sync.InfoBusy -and $sync.InfoDone) { Complete-InfoLoad }
     if ($sync.FpsBusy) {
         $ui.FpsInfo.Text = $sync.FpsStatus; $ui.StatusText.Text = $sync.FpsStatus
         if ($sync.FpsDone) { Complete-FpsTest }
@@ -4885,7 +4982,7 @@ $ui.BtnNone.Add_Click({ foreach ($cb in $script:CheckMap.Values) { $cb.IsChecked
 foreach ($b in $script:ModeButtons) { $b.Add_Click({ param($s) Invoke-Mode $s.Tag }) }
 $ui.BtnDriver.Add_Click({ if ($script:DriverUrl) { Start-Process $script:DriverUrl } })
 $ui.BtnRestore.Add_Click({ Start-Run @() $true 'restore' })
-$ui.BtnRefresh.Add_Click({ Update-Info })
+$ui.BtnRefresh.Add_Click({ Start-InfoLoad })
 $ui.BtnReport.Add_Click({
     try { Export-Report } catch { Show-Msg "Não foi possível gerar o relatório: $($_.Exception.Message)" 'OK' 'Error' | Out-Null }
 })
@@ -4980,16 +5077,14 @@ $window.Add_ContentRendered({
     [void]$script:monPS.BeginInvoke()
     $ui.StatusText.Text = 'Lendo informações do computador...'
     $ui.FooterTasks.Visibility = 'Collapsed'
+    # o Painel e a detecção de uso são lidos em segundo plano: a janela já fica usável (Complete-InfoLoad termina o resto)
+    Start-InfoLoad
     [void](Load-Startup)
     Load-History
-    Update-Info
     Update-Drives
     $sync.MonActive = $true
-    $ui.StatusText.Text = 'Vendo para que este PC é usado...'
-    Initialize-Usage
     # barra lateral fica no modelo visual das abas: os elementos dela são achados por lá
     $tpl = $ui.Tabs.Template
-    $tpl.FindName('VersionText', $ui.Tabs).Text = "v$AppVersion"
     $script:BtnUpdate = $tpl.FindName('BtnUpdate', $ui.Tabs)
     $script:TxtUpdate = $tpl.FindName('TxtUpdate', $ui.Tabs)
     $script:BtnUpdate.Add_Click({ if ($script:PendingUpdate) { Install-Update $script:PendingUpdate } else { Start-UpdateCheck -Manual } })
@@ -4997,7 +5092,6 @@ $window.Add_ContentRendered({
     Start-UpdateCheck
     $lastFps = @(Get-FpsHistory) | Select-Object -Last 1
     if ($lastFps) { Render-FpsResult $lastFps @(Get-FpsHistory | Select-Object -SkipLast 1) }
-    $ui.StatusText.Text = 'Pronto. Escolha um modo no Painel.'
 })
 
 $window.Add_Closing({

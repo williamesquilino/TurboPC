@@ -182,8 +182,9 @@ function Show-UsageQuestion {
 }
 
 # Lê preferências, detecta o uso e, se ainda não perguntou, pergunta
-function Initialize-Usage([switch]$Ask) {
-    $script:UsageGuess = Get-UsageGuess
+# $Guess vem pronto da leitura em segundo plano; se não vier, calcula aqui
+function Initialize-Usage([switch]$Ask, $Guess) {
+    if ($Guess) { $script:UsageGuess = $Guess } elseif (-not $script:UsageGuess) { $script:UsageGuess = Get-UsageGuess }
     $prefs = Get-Prefs
     $script:SavedAnswers = Get-SavedAnswers $prefs
     $script:UsageKind = if ($prefs -and $prefs.Kind -and $UsageKinds.Contains([string]$prefs.Kind)) { [string]$prefs.Kind } else { $null }

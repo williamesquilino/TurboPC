@@ -69,6 +69,14 @@
             $i++
             if ($OnProgress) { & $OnProgress ([int](100 * $i / [math]::Max(1, $items.Count))) "Desfazendo $i de $($items.Count)" }
             try {
+                # política (GPO) que mudou depois do TurboPC: a empresa mexeu nela, então fica como a empresa deixou
+                if ($it.T -eq 'reg' -and $it.P -match '\\Policies\\' -and $it.PSObject.Properties.Name -contains 'S') {
+                    $cur = (Get-ItemProperty -LiteralPath $it.P -Name $it.N -ErrorAction SilentlyContinue).($it.N)
+                    if ($null -eq $cur -or (@($cur) -join ',') -ne (@($it.S) -join ',')) {
+                        Write-TLog "  $($it.N) em $($it.P -replace '^Registry::', '') foi mudado depois (provavelmente pela GPO): mantido como está"
+                        $ok++; continue
+                    }
+                }
                 switch ($it.T) {
                     'reg' {
                         if ($it.E) {

@@ -73,6 +73,8 @@ $TaskIcons = @{
 $AppIcons = @{ 'Navegadores'='E774'; 'Escritório'='E8A5'; 'Comunicação'='E8BD'; 'Acesso remoto'='E7F4'; 'Utilitários'='E713'; 'Mídia'='E714'
                'Jogos'='E7FC'; 'Componentes'='E8F1'; 'Diagnóstico'='E9D9'; 'Desenvolvimento'='E943' }
 
+# a versão vai direto no XAML: aparece certa desde o primeiro instante
+$Xaml = $Xaml.Replace('__VERSAO__', $AppVersion)
 $window = [Windows.Markup.XamlReader]::Parse($Xaml)
 $ui = @{}
 foreach ($m in [regex]::Matches($Xaml, 'x:Name="(\w+)"')) {

@@ -143,9 +143,15 @@
             Name='Navegadores não ficam abertos escondidos'
             Desc='Impede o Edge e o Chrome de continuarem rodando depois de fechados e de abrirem junto com o Windows (Inicialização Turbo). Economiza bastante RAM.'
             Action={
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' 'StartupBoostEnabled' 0
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' 'BackgroundModeEnabled' 0
-                Set-Reg 'HKLM:\SOFTWARE\Policies\Google\Chrome' 'BackgroundModeEnabled' 0
-                Write-TLog '  Edge e Chrome sem segundo plano' 'OK'
+                # navegador que já tem política da empresa (bloqueio de sites, extensões...) fica como está: quem manda nele é a GPO
+                $mine = 'StartupBoostEnabled', 'BackgroundModeEnabled'
+                foreach ($br in @(@{ N = 'Edge'; P = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'; V = $mine },
+                                  @{ N = 'Chrome'; P = 'HKLM:\SOFTWARE\Policies\Google\Chrome'; V = @('BackgroundModeEnabled') })) {
+                    $k = Get-Item -LiteralPath $br.P -ErrorAction SilentlyContinue
+                    $other = @(if ($k) { @($k.GetValueNames() | Where-Object { $mine -notcontains $_ }) + @($k.GetSubKeyNames()) })
+                    if ($other.Count) { Write-TLog "  $($br.N) já tem políticas da empresa: não foi alterado" 'WARN'; continue }
+                    foreach ($v in $br.V) { Set-Reg $br.P $v 0 }
+                    Write-TLog "  $($br.N) sem segundo plano" 'OK'
+                }
             } }
 

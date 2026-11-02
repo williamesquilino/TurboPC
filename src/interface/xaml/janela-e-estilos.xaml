@@ -283,7 +283,7 @@ $Xaml = @'
                   <StackPanel DockPanel.Dock="Bottom" Margin="28,0,16,18">
                     <TextBlock Text="Criado por" FontSize="10.5" Foreground="#555C6E"/>
                     <TextBlock Text="William Silva Esquilino" FontSize="12" FontWeight="SemiBold" Foreground="#9AA1B4" TextWrapping="Wrap" Margin="0,1,0,6"/>
-                    <TextBlock x:Name="VersionText" Text="v1.7.0" FontSize="11" Foreground="#555C6E"/>
+                    <TextBlock x:Name="VersionText" Text="v__VERSAO__" FontSize="11" Foreground="#555C6E"/>
                     <Button x:Name="BtnUpdate" Style="{StaticResource BtnGhost}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,5" FontSize="11.5">
                       <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" Margin="0,2,6,0"/><TextBlock x:Name="TxtUpdate" Text="Procurar atualização"/></StackPanel>
                     </Button>

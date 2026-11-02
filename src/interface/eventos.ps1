@@ -9,7 +9,7 @@ $ui.BtnNone.Add_Click({ foreach ($cb in $script:CheckMap.Values) { $cb.IsChecked
 foreach ($b in $script:ModeButtons) { $b.Add_Click({ param($s) Invoke-Mode $s.Tag }) }
 $ui.BtnDriver.Add_Click({ if ($script:DriverUrl) { Start-Process $script:DriverUrl } })
 $ui.BtnRestore.Add_Click({ Start-Run @() $true 'restore' })
-$ui.BtnRefresh.Add_Click({ Update-Info })
+$ui.BtnRefresh.Add_Click({ Start-InfoLoad })
 $ui.BtnReport.Add_Click({
     try { Export-Report } catch { Show-Msg "Não foi possível gerar o relatório: $($_.Exception.Message)" 'OK' 'Error' | Out-Null }
 })
@@ -104,16 +104,14 @@ $window.Add_ContentRendered({
     [void]$script:monPS.BeginInvoke()
     $ui.StatusText.Text = 'Lendo informações do computador...'
     $ui.FooterTasks.Visibility = 'Collapsed'
+    # o Painel e a detecção de uso são lidos em segundo plano: a janela já fica usável (Complete-InfoLoad termina o resto)
+    Start-InfoLoad
     [void](Load-Startup)
     Load-History
-    Update-Info
     Update-Drives
     $sync.MonActive = $true
-    $ui.StatusText.Text = 'Vendo para que este PC é usado...'
-    Initialize-Usage
     # barra lateral fica no modelo visual das abas: os elementos dela são achados por lá
     $tpl = $ui.Tabs.Template
-    $tpl.FindName('VersionText', $ui.Tabs).Text = "v$AppVersion"
     $script:BtnUpdate = $tpl.FindName('BtnUpdate', $ui.Tabs)
     $script:TxtUpdate = $tpl.FindName('TxtUpdate', $ui.Tabs)
     $script:BtnUpdate.Add_Click({ if ($script:PendingUpdate) { Install-Update $script:PendingUpdate } else { Start-UpdateCheck -Manual } })
@@ -121,7 +119,6 @@ $window.Add_ContentRendered({
     Start-UpdateCheck
     $lastFps = @(Get-FpsHistory) | Select-Object -Last 1
     if ($lastFps) { Render-FpsResult $lastFps @(Get-FpsHistory | Select-Object -SkipLast 1) }
-    $ui.StatusText.Text = 'Pronto. Escolha um modo no Painel.'
 })
 
 $window.Add_Closing({

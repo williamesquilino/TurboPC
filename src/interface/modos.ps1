@@ -296,10 +296,10 @@ function Invoke-Mode([string]$Key) {
 Build-ModeCards
 
 # Faixa "Este PC" acima dos modos: tipo de PC, plano de energia e tomada/bateria. Devolve um aviso para o diagnóstico, se houver.
-function Update-PcBanner([string]$Hardware) {
-    $plan = (Get-CimInstance -Namespace root\cimv2\power -ClassName Win32_PowerPlan -Filter 'IsActive=True' -ErrorAction SilentlyContinue | Select-Object -First 1).ElementName
+function Update-PcBanner([string]$Hardware, $D) {
+    $plan = $D.Plan
     if (-not $plan) {
-        $out = "$(powercfg /getactivescheme 2>$null)"
+        $out = [string]$D.PlanOut
         $known = @{ '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Equilibrado'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'Alto desempenho'
                     'a1841308-3541-4fab-bc81-f71556f20b4a' = 'Economia de energia'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Desempenho Máximo' }
         $guid = [regex]::Match($out, '[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}').Value.ToLower()
@@ -307,7 +307,7 @@ function Update-PcBanner([string]$Hardware) {
     }
     $fast = $plan -match 'Alto|High|M.ximo|Ultimate|Desempenho'
     $saver = $plan -match 'Economia|saver'
-    $bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+    $bat = $D.Bat
     $warn = $null
     if ($Global:IsLaptop -and $bat) {
         $onAC = $bat.BatteryStatus -ne 1
